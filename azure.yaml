@@ -1,0 +1,23 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+#
+# Azure Developer CLI (azd) project, patterned after DanWahlin/customer-insights.
+#   azd up          -> provisions infra/ (Bicep), builds the Docker image, pushes it and deploys.
+#   azd provision   -> infrastructure only.   azd deploy -> image build + push + container update only.
+# See docs/azure-deploy.md for the one-time prerequisites (SQL user, Entra app registration).
+name: invoiceportal-admin
+metadata:
+  template: invoiceportal-admin@0.1.0
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  app:
+    project: InvoicePortal.Admin
+    language: dotnet
+    host: containerapp
+    docker:
+      path: Dockerfile
+      context: ..

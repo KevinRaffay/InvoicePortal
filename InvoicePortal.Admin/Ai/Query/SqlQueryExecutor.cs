@@ -1,6 +1,7 @@
 using System.Data;
 using System.Data.Common;
 using InvoicePortal.Admin.Data;
+using InvoicePortal.Admin.Telemetry;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 
@@ -14,6 +15,26 @@ namespace InvoicePortal.Admin.Ai.Query;
 public sealed class SqlQueryExecutor(IDbContextFactory<InvoicePortalDbContext> factory, IOptions<AiOptions> options) : ISqlQueryExecutor
 {
     public async Task<QueryResult> ExecuteAsync(GeneratedQuery query, CancellationToken cancellationToken = default)
+    {
+        // The SqlClient instrumentation adds the child db span (statement text only when Telemetry:RecordSqlText is on);
+        // this parent carries the guard outcome and row counts.
+        using var activity = InvoicePortalTelemetry.Source.StartActivity("ai.query.execute");
+        try
+        {
+            var result = await ExecuteCoreAsync(query, cancellationToken);
+            activity?.SetTag("ai.query.row_count", result.Rows.Count);
+            activity?.SetTag("ai.query.truncated", result.Truncated);
+            InvoicePortalTelemetry.AiQueryRows.Record(result.Rows.Count);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            activity.RecordException(ex);
+            throw;
+        }
+    }
+
+    private async Task<QueryResult> ExecuteCoreAsync(GeneratedQuery query, CancellationToken cancellationToken)
     {
         var sql = SqlGuard.Validate(query.Sql, query.ParamValues);
         var maxRows = options.Value.MaxRows;

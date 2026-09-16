@@ -11,7 +11,8 @@ public class AiOptionsTests
     [Theory]
     [InlineData("Mock", true)]
     [InlineData("Ollama", true)]
-    [InlineData("AzureOpenAI", false)]
+    [InlineData("AzureOpenAI", true)]
+    [InlineData("OpenAI", false)]
     [InlineData("", false)]
     public void Only_registered_providers_are_valid(string provider, bool expected)
     {

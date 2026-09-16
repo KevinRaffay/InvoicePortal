@@ -18,6 +18,10 @@
     {
         <text>&nbsp;(local model <b>@Ai.Value.Ollama.Model</b> at @Ai.Value.Ollama.Endpoint; free-form questions work, and the guards reject bad SQL).</text>
     }
+    else if (Ai.Value.Provider == "AzureOpenAI")
+    {
+        <text>&nbsp;(deployment <b>@Ai.Value.AzureOpenAI.Deployment</b>; free-form questions work, and the guards reject bad SQL).</text>
+    }
     else
     {
         <text>&nbsp;(pattern-matched intents; the prompt, guards and execution are real).</text>

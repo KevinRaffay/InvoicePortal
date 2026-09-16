@@ -5,3 +5,7 @@
 .env
 .env.*
 .git
+.github/
+infra/
+docs/
+.azure/

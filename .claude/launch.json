@@ -8,13 +8,23 @@
       "port": 5098
     },
     {
+      "name": "admin-host-otel",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "InvoicePortal.Admin/InvoicePortal.Admin.csproj", "--launch-profile", "http-otel"],
+      "port": 5098
+    },
+    {
+      "name": "otel-dashboard",
+      "url": "http://localhost:18888"
+    },
+    {
       "name": "admin-docker",
       "url": "http://localhost:8080"
     },
     {
       "name": "docs",
-      "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8090", "--directory", "docs"],
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["docs/serve.cjs", "8090"],
       "port": 8090
     }
   ]

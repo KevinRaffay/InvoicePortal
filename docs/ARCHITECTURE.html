@@ -5,137 +5,60 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <!--
-  Standalone rendering of ARCHITECTURE.md. Diagrams are Mermaid source inside <pre class="mermaid">
-  blocks and are drawn client-side by mermaid.js loaded from jsdelivr, so this file needs network access
-  the first time it is opened. Without it the diagram source is shown as text. Keep ARCHITECTURE.md as
-  the source of record and regenerate this page when it changes.
+  GENERATED FILE. Do not edit by hand.
+  Source: ARCHITECTURE.md in the repo root. Rebuild with: npm run build (in docs/), or npm run build:pdf for the PDF too.
+  Generated 2026-09-16. Diagrams are drawn client-side by mermaid.js 11.4.1 from jsdelivr.
 -->
-<title>Invoice Portal Admin Architecture</title>
+<title>Invoice Portal Admin: Architecture</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root {
-    --paper: #f5f7fa;
-    --surface: #ffffff;
-    --ink: #1b2430;
-    --ink-soft: #55616f;
-    --line: #d6dce4;
-    --accent: #2c5c8a;
-    --accent-soft: #e4edf6;
-    --code-bg: #eaeff5;
-    --warn-bg: #fbf3e3;
-    --warn-line: #d9a33a;
+    --paper: #f5f7fa; --surface: #ffffff; --ink: #1b2430; --ink-soft: #55616f; --line: #d6dce4;
+    --accent: #2c5c8a; --accent-soft: #e4edf6; --code-bg: #eaeff5; --warn-bg: #fbf3e3; --warn-line: #d9a33a;
     --sans: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
     --mono: "IBM Plex Mono", Consolas, "SFMono-Regular", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --paper: #11161c;
-      --surface: #171e26;
-      --ink: #e2e7ed;
-      --ink-soft: #9aa6b3;
-      --line: #2b343f;
-      --accent: #7fb0e0;
-      --accent-soft: #1d2d3f;
-      --code-bg: #1d252f;
-      --warn-bg: #2a2418;
-      --warn-line: #c8973a;
+      --paper: #11161c; --surface: #171e26; --ink: #e2e7ed; --ink-soft: #9aa6b3; --line: #2b343f;
+      --accent: #7fb0e0; --accent-soft: #1d2d3f; --code-bg: #1d252f; --warn-bg: #2a2418; --warn-line: #c8973a;
     }
   }
   :root[data-theme="dark"] {
-    --paper: #11161c;
-    --surface: #171e26;
-    --ink: #e2e7ed;
-    --ink-soft: #9aa6b3;
-    --line: #2b343f;
-    --accent: #7fb0e0;
-    --accent-soft: #1d2d3f;
-    --code-bg: #1d252f;
-    --warn-bg: #2a2418;
-    --warn-line: #c8973a;
+    --paper: #11161c; --surface: #171e26; --ink: #e2e7ed; --ink-soft: #9aa6b3; --line: #2b343f;
+    --accent: #7fb0e0; --accent-soft: #1d2d3f; --code-bg: #1d252f; --warn-bg: #2a2418; --warn-line: #c8973a;
   }
-
   html, body { margin: 0; }
   img { max-width: 100%; }
-  body {
-    background: var(--paper);
-    color: var(--ink);
-    font-family: var(--sans);
-    font-size: 15.5px;
-    line-height: 1.6;
-    padding-inline: 20px;
-    padding-block: 0 56px;
-  }
+  body { background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15.5px; line-height: 1.6;
+         padding-inline: 20px; padding-block: 0 56px; }
   a { color: var(--accent); text-decoration: none; }
   a:hover, a:focus-visible { text-decoration: underline; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-
-  .page {
-    max-width: 1180px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
+  .page { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: 1fr; gap: 32px; }
   @media (min-width: 1080px) {
     .page { grid-template-columns: 220px minmax(0, 1fr); }
-    .toc { position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; padding-top: 40px; max-height: 100vh; overflow-y: auto; }
+    .toc { position: sticky; top: 0; align-self: start; padding-top: 40px; max-height: 100vh; overflow-y: auto; }
   }
-
-  header.masthead {
-    grid-column: 1 / -1;
-    padding-top: 40px;
-    border-bottom: 1px solid var(--line);
-    padding-bottom: 24px;
-  }
-  .eyebrow {
-    font-family: var(--mono);
-    font-size: 12px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--accent);
-    margin: 0 0 8px;
-  }
-  h1 {
-    font-size: clamp(28px, 4vw, 38px);
-    font-weight: 600;
-    line-height: 1.15;
-    margin: 0 0 12px;
-    text-wrap: balance;
-    letter-spacing: -0.01em;
-  }
-  .meta {
-    color: var(--ink-soft);
-    font-size: 14px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px 20px;
-    margin: 0;
-  }
+  header.masthead { grid-column: 1 / -1; padding-top: 40px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  h1 { font-size: clamp(28px, 4vw, 38px); font-weight: 600; line-height: 1.15; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+  .meta { color: var(--ink-soft); font-size: 14px; display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 0; }
   .meta code { font-size: 13px; }
-
   .toc { font-size: 13.5px; }
-  .toc h2 { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; font-weight: 500; }
+  .toc h2 { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 10px; font-weight: 500; display: block; }
   .toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .toc li { margin: 0; }
   .toc li a { display: grid; grid-template-columns: 22px 1fr; gap: 6px; color: var(--ink); line-height: 1.35; }
   .toc li a span { font-family: var(--mono); color: var(--ink-soft); font-size: 12px; padding-top: 2px; }
   @media (max-width: 1079px) {
     .toc ol { flex-direction: row; flex-wrap: wrap; gap: 8px 16px; }
     .toc li a { grid-template-columns: auto 1fr; }
   }
-
   main { min-width: 0; }
   main > section { padding-block: 28px 8px; }
   main > section + section { border-top: 1px solid var(--line); }
-  h2 {
-    font-size: 23px;
-    font-weight: 600;
-    margin: 0 0 14px;
-    display: grid;
-    grid-template-columns: 34px 1fr;
-    gap: 8px;
-    align-items: baseline;
-    text-wrap: balance;
-  }
+  h2 { font-size: 23px; font-weight: 600; margin: 0 0 14px; display: grid; grid-template-columns: 34px 1fr; gap: 8px; align-items: baseline; text-wrap: balance; }
   h2 .num { font-family: var(--mono); font-size: 15px; color: var(--accent); font-weight: 500; }
   h3 { font-size: 17px; font-weight: 600; margin: 26px 0 8px; }
   p { margin: 0 0 14px; max-width: 76ch; }
@@ -143,68 +66,43 @@
   ul, ol.steps { margin: 0 0 16px; padding-left: 22px; max-width: 76ch; }
   li { margin-bottom: 6px; }
   strong { font-weight: 600; }
-
-  code {
-    font-family: var(--mono);
-    font-size: 0.88em;
-    background: var(--code-bg);
-    padding: 1px 5px;
-    border-radius: 3px;
-  }
-  pre.code {
-    font-family: var(--mono);
-    font-size: 13px;
-    line-height: 1.55;
-    background: var(--code-bg);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 14px 16px;
-    overflow-x: auto;
-    margin: 0 0 16px;
-  }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  pre.code { font-family: var(--mono); font-size: 13px; line-height: 1.55; background: var(--code-bg); border: 1px solid var(--line);
+             border-radius: 4px; padding: 14px 16px; overflow-x: auto; margin: 0 0 16px; }
   pre.code code { background: none; padding: 0; font-size: inherit; }
-
   .table-wrap { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
   table { border-collapse: collapse; width: 100%; font-size: 14px; min-width: 560px; }
   th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
   th { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft); font-weight: 500; background: var(--paper); }
   tr:last-child td { border-bottom: 0; }
-  td.num { font-variant-numeric: tabular-nums; }
-
-  figure.diagram {
-    margin: 0 0 18px;
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 4px;
-    padding: 12px 14px 6px;
-    overflow-x: auto;
-  }
+  figure.diagram { margin: 0 0 18px; background: var(--surface); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px 10px; overflow-x: auto; }
   figure.diagram pre.mermaid { margin: 0; font-family: var(--mono); font-size: 13px; }
-  figure.diagram figcaption {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--ink-soft);
-    padding: 8px 2px 6px;
-    border-top: 1px solid var(--line);
-    margin-top: 8px;
-  }
-
-  .callout {
-    border-left: 3px solid var(--warn-line);
-    background: var(--warn-bg);
-    padding: 12px 16px;
-    border-radius: 0 4px 4px 0;
-    margin: 0 0 16px;
-    max-width: 80ch;
-  }
+  .callout { border-left: 3px solid var(--warn-line); background: var(--warn-bg); padding: 12px 16px; border-radius: 0 4px 4px 0; margin: 0 0 16px; max-width: 80ch; }
   .callout p:last-child { margin-bottom: 0; }
   .callout .label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--warn-line); display: block; margin-bottom: 4px; }
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
 
-  .tree { font-family: var(--mono); font-size: 13px; line-height: 1.6; }
-  .tree .c { color: var(--ink-soft); }
-
-  @media (prefers-reduced-motion: no-preference) {
-    html { scroll-behavior: smooth; }
+  /* Print / PDF: single column, one section per page, nothing clipped. */
+  @media print {
+    body { background: #fff; color: #1b2430; font-size: 10.5pt; line-height: 1.5; padding: 0; }
+    .page { display: block; max-width: none; }
+    header.masthead { padding-top: 0; }
+    .toc { position: static; padding: 16px 0 0; max-height: none; break-after: page; }
+    .toc ol { flex-direction: column; gap: 4px; }
+    .toc li a { grid-template-columns: 22px 1fr; }
+    main > section { border-top: 0; padding-block: 0 8px; }
+    main > section + section { break-before: page; }
+    h2, h3 { break-after: avoid; }
+    h2 { font-size: 18pt; }
+    h3 { font-size: 12.5pt; }
+    p, ul, ol.steps, .lede, .callout { max-width: none; }
+    figure.diagram, .table-wrap, pre.code, .callout, tr { break-inside: avoid; }
+    figure.diagram, .table-wrap, pre.code { overflow: visible; }
+    figure.diagram svg { max-width: 100% !important; height: auto !important; }
+    table { min-width: 0; font-size: 9pt; }
+    th, td { padding: 6px 8px; }
+    pre.code { font-size: 8.5pt; white-space: pre-wrap; word-break: break-word; }
+    a { color: inherit; }
   }
 </style>
 </head>
@@ -212,117 +110,216 @@
 <div class="page">
   <header class="masthead">
     <p class="eyebrow">Architecture</p>
-    <h1>Invoice Portal Admin</h1>
+    <h1>Invoice Portal Admin: Architecture</h1>
     <p class="meta">
-      <span>.NET 10 · Blazor Interactive Server · Radzen · EF Core · SQL Server 2022 Express · Microsoft.Extensions.AI</span>
       <span>Source of record: <code>ARCHITECTURE.md</code> in the repo root</span>
+      <span>Generated 2026-09-16 by <code>docs/build.js</code></span>
     </p>
   </header>
-
-  <nav class="toc" aria-label="Contents">
-    <h2>Contents</h2>
-    <ol>
-      <li><a href="#context"><span>1</span>System context</a></li>
-      <li><a href="#solution"><span>2</span>Solution structure</a></li>
-      <li><a href="#runtime"><span>3</span>Runtime architecture</a></li>
-      <li><a href="#model"><span>4</span>Data model</a></li>
-      <li><a href="#flows"><span>5</span>Data flows</a></li>
-      <li><a href="#db"><span>6</span>Database integration</a></li>
-      <li><a href="#ai"><span>7</span>AI integration</a></li>
-      <li><a href="#config"><span>8</span>Configuration</a></li>
-      <li><a href="#security"><span>9</span>Security posture</a></li>
-      <li><a href="#tests"><span>10</span>Testing</a></li>
-      <li><a href="#limits"><span>11</span>Limits and seams</a></li>
-    </ol>
-  </nav>
-
+  <nav class="toc" aria-label="Contents"><h2>Contents</h2><ol>
+      <li><a href="#system-context"><span>1</span>System context</a></li>
+      <li><a href="#solution-structure"><span>2</span>Solution structure</a></li>
+      <li><a href="#runtime-architecture-of-the-admin-app"><span>3</span>Runtime architecture of the admin app</a></li>
+      <li><a href="#data-model"><span>4</span>Data model</a></li>
+      <li><a href="#data-flows"><span>5</span>Data flows</a></li>
+      <li><a href="#database-integration-points"><span>6</span>Database integration points</a></li>
+      <li><a href="#ai-service-integration-points"><span>7</span>AI service integration points</a></li>
+      <li><a href="#configuration-and-environments"><span>8</span>Configuration and environments</a></li>
+      <li><a href="#security-and-safety-posture"><span>9</span>Security and safety posture</a></li>
+      <li><a href="#testing"><span>10</span>Testing</a></li>
+      <li><a href="#known-limitations-and-extension-points"><span>11</span>Known limitations and extension points</a></li>
+    </ol></nav>
   <main>
-    <section id="summary">
-      <p class="lede">A .NET 10 Blazor Web App (Interactive Server render mode, Radzen components) administers a local copy of the Invoice Portal database. The database is SQL Server 2022 Express in Docker, populated once from a production bacpac by a one-shot console app. All data access goes through an EF Core scaffolded model behind a <code>DbContext</code> factory. Two AI features, natural-language-to-SQL and grounded document Q&amp;A, are built on the <code>Microsoft.Extensions.AI</code> abstractions with every external model and index replaced by an in-process mock. Nothing calls out to Azure or any other network service.</p>
-    </section>
-
-    <section id="context">
-      <h2><span class="num">1</span>System context</h2>
-      <figure class="diagram">
-<pre class="mermaid">
+<section id="summary">
+<p class="lede">This document describes the structure, data flows and integration points of the Invoice Portal Admin
+proof of concept. It complements <a href="../README.md">README.md</a>, which covers how to run the solution.</p>
+<p>The diagrams are Mermaid. If your Markdown viewer does not draw them, open
+<a href="../docs/ARCHITECTURE.html">docs/ARCHITECTURE.html</a> in a browser: it is the same content with the diagrams
+rendered (needs network access once to load mermaid.js from a CDN). A PDF is at
+<a href="../docs/ARCHITECTURE.pdf">docs/ARCHITECTURE.pdf</a>. Both are generated from this file; after editing, rebuild
+them with <code>npm run build:pdf</code> in the <code>docs/</code> folder (see <code>docs/package.json</code>).</p>
+<p><strong>One-paragraph summary.</strong> A .NET 10 Blazor Web App (Interactive Server render mode, Radzen components)
+administers a local copy of the Invoice Portal database. The database is SQL Server 2022 Express running in
+Docker, populated once from a production bacpac by a one-shot console app. All data access goes through an
+EF Core scaffolded model behind a <code>DbContext</code> factory. Two AI features, natural-language-to-SQL and grounded
+document Q&amp;A, are built on the <code>Microsoft.Extensions.AI</code> abstractions. The chat model is pluggable: the default
+<code>Mock</code> provider is an in-process fake that needs no network, <code>Ollama</code> talks to a local model, and <code>AzureOpenAI</code>
+talks to an Azure OpenAI deployment with Entra ID credentials. The document index is always in-process. An
+<code>azd</code> template under <code>infra/</code> can host the container in Azure Container Apps against the existing Azure SQL
+database. With the defaults, nothing leaves the machine.</p>
+</section>
+<section id="system-context">
+<h2><span class="num">1</span>System context</h2>
+<figure class="diagram"><pre class="mermaid">
 flowchart LR
-    Browser["Browser&lt;br/&gt;(SignalR circuit)"]
-    subgraph compose["docker compose (single host)"]
-        App["app&lt;br/&gt;InvoicePortal.Admin&lt;br/&gt;Blazor Server :8080"]
-        Sql[("sql&lt;br/&gt;SQL Server 2022 Express&lt;br/&gt;:1433, volume mssql-data")]
-        Init["db-init&lt;br/&gt;InvoicePortal.DbInit&lt;br/&gt;one-shot, DacFx"]
+    Browser[&quot;Browser&lt;br/&gt;(SignalR circuit)&quot;]
+    subgraph compose[&quot;docker compose (single host)&quot;]
+        App[&quot;app&lt;br/&gt;InvoicePortal.Admin&lt;br/&gt;Blazor Server :8080&quot;]
+        Sql[(&quot;sql&lt;br/&gt;SQL Server 2022 Express&lt;br/&gt;:1433, volume mssql-data&quot;)]
+        Init[&quot;db-init&lt;br/&gt;InvoicePortal.DbInit&lt;br/&gt;one-shot, DacFx&quot;]
     end
-    Bacpac["mec-invoiceportal-prod.bacpac&lt;br/&gt;(read-only bind mount)"]
+    Bacpac[&quot;mec-invoiceportal-prod.bacpac&lt;br/&gt;(read-only bind mount)&quot;]
+    Model[&quot;Chat model (optional)&lt;br/&gt;Ollama on the host or the ollama profile,&lt;br/&gt;or an Azure OpenAI deployment&quot;]
 
-    Browser &lt;--&gt;|"HTTP + WebSocket"| App
-    App --&gt;|"EF Core / ADO.NET (TDS)"| Sql
-    Init --&gt;|"SqlClient + DacFx import"| Sql
-    Bacpac -.-&gt;|"mounted at /bacpac/source.bacpac"| Init
-</pre>
-        <figcaption>Three compose services on one host. Start-up order is enforced by health conditions.</figcaption>
-      </figure>
-      <p>Compose start-up ordering is enforced with health conditions: <code>db-init</code> waits for <code>sql</code> to pass its <code>sqlcmd</code> health check, and <code>app</code> waits for <code>db-init</code> to exit successfully.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Service</th><th>Image / build</th><th>Role</th></tr></thead>
-        <tbody>
-          <tr><td><code>sql</code></td><td><code>mcr.microsoft.com/mssql/server:2022-latest</code>, <code>MSSQL_PID=Express</code></td><td>Database engine. Data persists in the <code>mssql-data</code> volume.</td></tr>
-          <tr><td><code>db-init</code></td><td><code>InvoicePortal.DbInit/Dockerfile</code></td><td>Sanitises and imports the bacpac if the database does not exist.</td></tr>
-          <tr><td><code>app</code></td><td><code>InvoicePortal.Admin/Dockerfile</code></td><td>The admin UI. HTTP only, port 8080.</td></tr>
-        </tbody>
-      </table></div>
-      <p>There is no authentication or authorization layer in the app. It is intended for a single developer on a local machine.</p>
-    </section>
-
-    <section id="solution">
-      <h2><span class="num">2</span>Solution structure</h2>
-<pre class="code tree"><code>InvoicePortal.slnx
-├── InvoicePortal.DbInit/          <span class="c">console app: bacpac sanitiser + DacFx importer</span>
-├── InvoicePortal.Admin/           <span class="c">Blazor Web App</span>
-│   ├── Program.cs                 <span class="c">composition root (EntryPoint.Main)</span>
-│   ├── Components/                <span class="c">Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases</span>
-│   ├── Services/                  <span class="c">CrudService&lt;T&gt;, LookupService, EnumDisplay</span>
-│   ├── Data/                      <span class="c">EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions</span>
-│   └── Ai/                        <span class="c">AI slice: options, DI, Chat (mock), Query (NL-&gt;SQL), Documents (RAG)</span>
-└── InvoicePortal.Admin.Tests/     <span class="c">xUnit tests for the AI slice, no database required</span></code></pre>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Package</th><th>Version</th><th>Used for</th></tr></thead>
-        <tbody>
-          <tr><td><code>Microsoft.EntityFrameworkCore.SqlServer</code></td><td class="num">10.0.12</td><td>Data access</td></tr>
-          <tr><td><code>Radzen.Blazor</code></td><td class="num">11.4.0</td><td>Grids, dialogs, forms, notifications</td></tr>
-          <tr><td><code>Microsoft.Extensions.AI</code> (+ Abstractions)</td><td class="num">10.10.0</td><td><code>IChatClient</code> seam, logging decorator</td></tr>
-          <tr><td><code>Microsoft.SqlServer.DacFx</code></td><td class="num">170.5.76</td><td>Bacpac import (DbInit only)</td></tr>
-        </tbody>
-      </table></div>
-    </section>
-
-    <section id="runtime">
-      <h2><span class="num">3</span>Runtime architecture of the admin app</h2>
-      <h3>3.1 Layers</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+    Browser &lt;--&gt;|&quot;HTTP + WebSocket&quot;| App
+    App --&gt;|&quot;EF Core / ADO.NET (TDS)&quot;| Sql
+    App -.-&gt;|&quot;IChatClient, only when Ai:Provider is not Mock&quot;| Model
+    Init --&gt;|&quot;SqlClient + DacFx import&quot;| Sql
+    Bacpac -.-&gt;|&quot;mounted at /bacpac/source.bacpac&quot;| Init
+</pre></figure>
+<p>Compose start-up ordering is enforced with health conditions: <code>db-init</code> waits for <code>sql</code> to pass its
+<code>sqlcmd</code> health check, and <code>app</code> waits for <code>db-init</code> to exit successfully.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Service</th>
+<th>Image / build</th>
+<th>Role</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>sql</code></td>
+<td><code>mcr.microsoft.com/mssql/server:2022-latest</code>, <code>MSSQL_PID=Express</code></td>
+<td>Database engine. Data persists in the <code>mssql-data</code> volume.</td>
+</tr>
+<tr>
+<td><code>db-init</code></td>
+<td><code>InvoicePortal.DbInit/Dockerfile</code></td>
+<td>Sanitises and imports the bacpac if the database does not exist.</td>
+</tr>
+<tr>
+<td><code>app</code></td>
+<td><code>InvoicePortal.Admin/Dockerfile</code></td>
+<td>The admin UI. HTTP only, port 8080. Exposes <code>/healthz</code>.</td>
+</tr>
+<tr>
+<td><code>ollama</code></td>
+<td><code>ollama/ollama:latest</code>, profile <code>ollama</code> only</td>
+<td>Optional CPU-only local model. Started with <code>--profile ollama</code>; data in the <code>ollama-data</code> volume.</td>
+</tr>
+<tr>
+<td><code>aspire-dashboard</code></td>
+<td><code>mcr.microsoft.com/dotnet/aspire-dashboard:latest</code>, profile <code>otel</code> only</td>
+<td>Optional in-memory OTLP sink with a UI on 18888 (see 3.4). Started with <code>--profile otel</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Locally there is no authentication or authorization layer in the app. It is intended for a single developer
+on a local machine. The Azure deployment (section 8) can put Entra ID sign-in in front of the container with
+Easy Auth, without application code changes.</p>
+</section>
+<section id="solution-structure">
+<h2><span class="num">2</span>Solution structure</h2>
+<pre class="code"><code>InvoicePortal.slnx
+├── InvoicePortal.DbInit/          console app: bacpac sanitiser + DacFx importer
+├── InvoicePortal.Admin/           Blazor Web App
+│   ├── Program.cs                 composition root (EntryPoint.Main)
+│   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
+│   ├── Services/                  CrudService&lt;T&gt;, LookupService, EnumDisplay
+│   ├── Data/                      EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions
+│   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL-&gt;SQL), Documents (RAG)
+│   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
+├── InvoicePortal.Admin.Tests/     xUnit tests for the AI slice, no database required
+├── docs/                          this document's rendered copy + build script, Azure deployment guide
+├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
+├── azure.yaml                     Azure Developer CLI (azd) service definition
+└── .github/workflows/             ci.yml (build, test, Bicep validation) and azure-dev.yml (azd provision + deploy)</code></pre>
+<p>Key packages:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Package</th>
+<th>Version</th>
+<th>Used for</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Microsoft.EntityFrameworkCore.SqlServer</code></td>
+<td>10.0.12</td>
+<td>Data access</td>
+</tr>
+<tr>
+<td><code>Radzen.Blazor</code></td>
+<td>11.4.0</td>
+<td>Grids, dialogs, forms, notifications</td>
+</tr>
+<tr>
+<td><code>Microsoft.Extensions.AI</code> (+ Abstractions)</td>
+<td>10.10.0</td>
+<td><code>IChatClient</code> seam, pipeline builder, logging decorator</td>
+</tr>
+<tr>
+<td><code>OllamaSharp</code></td>
+<td>5.4.30</td>
+<td><code>IChatClient</code> for a local Ollama server (<code>Ollama</code> provider)</td>
+</tr>
+<tr>
+<td><code>Azure.AI.OpenAI</code>, <code>Microsoft.Extensions.AI.OpenAI</code></td>
+<td>2.1.0, 10.10.0</td>
+<td><code>IChatClient</code> for Azure OpenAI (<code>AzureOpenAI</code> provider)</td>
+</tr>
+<tr>
+<td><code>Azure.Identity</code></td>
+<td>1.21.0</td>
+<td><code>DefaultAzureCredential</code> for Azure OpenAI and Blob Storage</td>
+</tr>
+<tr>
+<td><code>Azure.Extensions.AspNetCore.DataProtection.Blobs</code></td>
+<td>1.5.4</td>
+<td>Data Protection key ring in Blob Storage when hosted in Azure</td>
+</tr>
+<tr>
+<td><code>OpenTelemetry.Extensions.Hosting</code> + <code>Instrumentation.AspNetCore</code>, <code>.Http</code>, <code>.SqlClient</code>, <code>.Runtime</code></td>
+<td>1.18.0</td>
+<td>Traces, metrics and logs (section 3.4)</td>
+</tr>
+<tr>
+<td><code>OpenTelemetry.Exporter.OpenTelemetryProtocol</code></td>
+<td>1.18.0</td>
+<td>OTLP export to the Aspire Dashboard or any collector</td>
+</tr>
+<tr>
+<td><code>Azure.Monitor.OpenTelemetry.Exporter</code></td>
+<td>1.9.0</td>
+<td>Export to Application Insights when hosted in Azure</td>
+</tr>
+<tr>
+<td><code>Microsoft.SqlServer.DacFx</code></td>
+<td>170.5.76</td>
+<td>Bacpac import (DbInit only)</td>
+</tr>
+</tbody>
+</table></div>
+</section>
+<section id="runtime-architecture-of-the-admin-app">
+<h2><span class="num">3</span>Runtime architecture of the admin app</h2>
+<h3>3.1 Layers</h3>
+<figure class="diagram"><pre class="mermaid">
 flowchart TB
-    subgraph UI["Components (Razor, Interactive Server)"]
-        Pages["Pages: Invoices, Bottlers, Payers,&lt;br/&gt;SalesCenters, Programs, Currencies"]
-        Dialogs["Edit dialogs (one per table)"]
-        AiPages["AiQuery.razor, AskDocumentsDialog.razor"]
-        Bases["CrudPageBase(T, TDialog)&lt;br/&gt;EditDialogBase(T)"]
+    subgraph UI[&quot;Components (Razor, Interactive Server)&quot;]
+        Pages[&quot;Pages: Invoices, Bottlers, Payers,&lt;br/&gt;SalesCenters, Programs, Currencies&quot;]
+        Dialogs[&quot;Edit dialogs (one per table)&quot;]
+        AiPages[&quot;AiQuery.razor, AskDocumentsDialog.razor&quot;]
+        Bases[&quot;CrudPageBase(T, TDialog)&lt;br/&gt;EditDialogBase(T)&quot;]
     end
-    subgraph Services["Services"]
-        Crud["CrudService(T)"]
-        Lookup["LookupService (30 s cache)"]
+    subgraph Services[&quot;Services&quot;]
+        Crud[&quot;CrudService(T)&quot;]
+        Lookup[&quot;LookupService (30 s cache)&quot;]
     end
-    subgraph AI["Ai slice"]
-        QGen["QueryGenerationService"]
-        Exec["SqlQueryExecutor"]
-        DocSvc["DocumentAnswerService"]
-        Retriever["IDocumentRetriever&lt;br/&gt;(InMemoryDocumentRetriever)"]
-        Chat["IChatClient&lt;br/&gt;(MockChatClient)"]
+    subgraph AI[&quot;Ai slice&quot;]
+        QGen[&quot;QueryGenerationService&quot;]
+        Exec[&quot;SqlQueryExecutor&quot;]
+        DocSvc[&quot;DocumentAnswerService&quot;]
+        Retriever[&quot;IDocumentRetriever&lt;br/&gt;(InMemoryDocumentRetriever)&quot;]
+        Chat[&quot;IChatClient&lt;br/&gt;(Mock, Ollama or AzureOpenAI)&quot;]
     end
-    subgraph Data["Data"]
-        Factory["IDbContextFactory of InvoicePortalDbContext"]
-        Ctx["InvoicePortalDbContext&lt;br/&gt;(scaffolded + partials)"]
+    subgraph Data[&quot;Data&quot;]
+        Factory[&quot;IDbContextFactory of InvoicePortalDbContext&quot;]
+        Ctx[&quot;InvoicePortalDbContext&lt;br/&gt;(scaffolded + partials)&quot;]
     end
-    Sql[("SQL Server")]
+    Sql[(&quot;SQL Server&quot;)]
 
     Pages --&gt; Bases --&gt; Crud
     Dialogs --&gt; Bases --&gt; Lookup
@@ -335,63 +332,235 @@ flowchart TB
     Exec --&gt; Factory
     Retriever --&gt; Factory
     Factory --&gt; Ctx --&gt; Sql
-</pre>
-        <figcaption>Every path to the database goes through the context factory.</figcaption>
-      </figure>
+</pre></figure>
+<h3>3.2 Dependency injection and lifetimes</h3>
+<p>Blazor Server keeps one DI scope per SignalR circuit, so &quot;scoped&quot; here means &quot;per browser session&quot;.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Registration</th>
+<th>Lifetime</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>IDbContextFactory&lt;InvoicePortalDbContext&gt;</code></td>
+<td>Singleton factory</td>
+<td>Contexts are created per operation and disposed immediately. <code>EnableRetryOnFailure(3)</code>.</td>
+</tr>
+<tr>
+<td><code>CrudService&lt;T&gt;</code> (open generic)</td>
+<td>Scoped</td>
+<td>One per entity type per circuit.</td>
+</tr>
+<tr>
+<td><code>LookupService</code></td>
+<td>Scoped</td>
+<td>Dropdown sources cached per circuit for 30 seconds.</td>
+</tr>
+<tr>
+<td><code>IChatClient</code></td>
+<td>Singleton</td>
+<td>Provider-dependent pipeline chosen by <code>Ai:Provider</code> (see 7.2). Always ends in <code>.UseOpenTelemetry()</code> then <code>.UseLogging()</code>.</td>
+</tr>
+<tr>
+<td>OpenTelemetry providers</td>
+<td>Singleton</td>
+<td><code>AddOpenTelemetry()</code> with tracing, metrics and logging (see 3.4). Skipped entirely when <code>Telemetry:Enabled</code> is false.</td>
+</tr>
+<tr>
+<td><code>IDocumentRetriever</code></td>
+<td>Singleton</td>
+<td><code>InMemoryDocumentRetriever</code> for every provider. Index built lazily on first use.</td>
+</tr>
+<tr>
+<td>Health checks</td>
+<td>n/a</td>
+<td><code>AddHealthChecks()</code> mapped at <code>/healthz</code> for container probes.</td>
+</tr>
+<tr>
+<td>Data Protection</td>
+<td>Singleton</td>
+<td>Only when <code>DataProtection:BlobUri</code> is set: key ring persisted to Blob Storage with <code>DefaultAzureCredential</code>, so antiforgery tokens survive container restarts. Locally the default file store is used.</td>
+</tr>
+<tr>
+<td><code>SchemaDescriber</code></td>
+<td>Singleton</td>
+<td>Schema text derived from EF model metadata, cached.</td>
+</tr>
+<tr>
+<td><code>AiRateLimiter</code></td>
+<td>Scoped</td>
+<td>Fixed window, default 10 requests per minute per circuit.</td>
+</tr>
+<tr>
+<td><code>IQueryGenerationService</code>, <code>ISqlQueryExecutor</code>, <code>IDocumentAnswerService</code></td>
+<td>Scoped</td>
+<td>Stateless orchestration.</td>
+</tr>
+<tr>
+<td>Radzen <code>DialogService</code>, <code>NotificationService</code></td>
+<td>Scoped</td>
+<td>Via <code>AddRadzenComponents()</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p>A factory is used instead of a scoped <code>DbContext</code> because a circuit can live for hours. A long-lived
+tracked context would accumulate state and hold a connection open.</p>
+<h3>3.3 Shared CRUD behaviour</h3>
+<p>Every grid page inherits <code>CrudPageBase&lt;TEntity, TDialog&gt;</code> and every edit dialog inherits
+<code>EditDialogBase&lt;TEntity&gt;</code>. Pages supply only the Radzen markup and a few overrides (<code>EntityName</code>, <code>KeyOf</code>,
+<code>Shape</code> for <code>Include</code>s, <code>DialogWidth</code>). The bases provide server-side <code>LoadData</code>, Add/Edit through a
+dialog, Delete with confirmation, Restore, the &quot;Show deleted&quot; toggle, and notifications.</p>
+<h3>3.4 Observability (OpenTelemetry)</h3>
+<p><code>Telemetry/TelemetryExtensions.cs</code> registers one OpenTelemetry pipeline for traces, metrics and logs. It is
+always on in-process; what leaves the process is decided by configuration.</p>
+<figure class="diagram"><pre class="mermaid">
+flowchart LR
+    subgraph app[&quot;InvoicePortal.Admin&quot;]
+        Req[&quot;ASP.NET Core requests&lt;br/&gt;(minus /healthz and static assets)&quot;]
+        Http[&quot;HttpClient&lt;br/&gt;(Ollama, Azure OpenAI, Blob)&quot;]
+        Sql[&quot;SqlClient commands&lt;br/&gt;(EF Core + guarded executor)&quot;]
+        Chat[&quot;IChatClient.UseOpenTelemetry&lt;br/&gt;(one chat span per model call, token usage)&quot;]
+        Own[&quot;ActivitySource InvoicePortal.Admin&lt;br/&gt;ai.query.generate, ai.query.execute, ai.documents.answer&quot;]
+        Logs[&quot;ILogger (with trace/span ids)&quot;]
+        Runtime[&quot;.NET runtime + EF Core meters&quot;]
+        SDK[&quot;OpenTelemetry SDK&lt;br/&gt;resource: service.name, version, instance, environment&quot;]
+    end
+    Otlp[&quot;OTLP endpoint&lt;br/&gt;Aspire Dashboard (compose profile otel),&lt;br/&gt;or any collector&quot;]
+    AppInsights[&quot;Application Insights&lt;br/&gt;(APPLICATIONINSIGHTS_CONNECTION_STRING)&quot;]
 
-      <h3>3.2 Dependency injection and lifetimes</h3>
-      <p>Blazor Server keeps one DI scope per SignalR circuit, so "scoped" here means "per browser session".</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Registration</th><th>Lifetime</th><th>Notes</th></tr></thead>
-        <tbody>
-          <tr><td><code>IDbContextFactory&lt;InvoicePortalDbContext&gt;</code></td><td>Singleton factory</td><td>Contexts are created per operation and disposed immediately. <code>EnableRetryOnFailure(3)</code>.</td></tr>
-          <tr><td><code>CrudService&lt;T&gt;</code> (open generic)</td><td>Scoped</td><td>One per entity type per circuit.</td></tr>
-          <tr><td><code>LookupService</code></td><td>Scoped</td><td>Dropdown sources cached per circuit for 30 seconds.</td></tr>
-          <tr><td><code>IChatClient</code></td><td>Singleton</td><td><code>MockChatClient</code> wrapped with <code>.UseLogging()</code>.</td></tr>
-          <tr><td><code>IDocumentRetriever</code></td><td>Singleton</td><td>Index built lazily on first use.</td></tr>
-          <tr><td><code>SchemaDescriber</code></td><td>Singleton</td><td>Schema text derived from EF model metadata, cached.</td></tr>
-          <tr><td><code>AiRateLimiter</code></td><td>Scoped</td><td>Fixed window, default 10 requests per minute per circuit.</td></tr>
-          <tr><td><code>IQueryGenerationService</code>, <code>ISqlQueryExecutor</code>, <code>IDocumentAnswerService</code></td><td>Scoped</td><td>Stateless orchestration.</td></tr>
-          <tr><td>Radzen <code>DialogService</code>, <code>NotificationService</code></td><td>Scoped</td><td>Via <code>AddRadzenComponents()</code>.</td></tr>
-        </tbody>
-      </table></div>
-      <p>A factory is used instead of a scoped <code>DbContext</code> because a circuit can live for hours. A long-lived tracked context would accumulate state and hold a connection open.</p>
-
-      <h3>3.3 Shared CRUD behaviour</h3>
-      <p>Every grid page inherits <code>CrudPageBase&lt;TEntity, TDialog&gt;</code> and every edit dialog inherits <code>EditDialogBase&lt;TEntity&gt;</code>. Pages supply only the Radzen markup and a few overrides (<code>EntityName</code>, <code>KeyOf</code>, <code>Shape</code> for Includes, <code>DialogWidth</code>). The bases provide server-side LoadData, Add/Edit through a dialog, Delete with confirmation, Restore, the "Show deleted" toggle, and notifications.</p>
-    </section>
-
-    <section id="model">
-      <h2><span class="num">4</span>Data model</h2>
-      <p>The EF Core model is scaffolded from the local database and never edited by hand (the re-scaffold command is in the README). Anything that must survive a re-scaffold lives in partial classes.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Table</th><th>Role in the UI</th><th>Soft delete</th><th>Audit columns</th></tr></thead>
-        <tbody>
-          <tr><td><code>Invoices</code></td><td>Full CRUD, tabbed dialog</td><td><code>IsDeleted</code> (bit)</td><td>yes</td></tr>
-          <tr><td><code>Bottlers</code></td><td>CRUD (SAP-sourced ids)</td><td>no</td><td>yes</td></tr>
-          <tr><td><code>Payers</code></td><td>CRUD (SAP-sourced ids)</td><td>no</td><td>yes</td></tr>
-          <tr><td><code>SalesCenters</code></td><td>CRUD (SAP-sourced ids)</td><td>no</td><td>yes</td></tr>
-          <tr><td><code>Programs</code></td><td>CRUD</td><td><code>IsDeleted</code> (nullable bit)</td><td>yes</td></tr>
-          <tr><td><code>Currencies</code></td><td>CRUD</td><td>no</td><td>yes</td></tr>
-          <tr><td><code>Companies</code>, <code>Countries</code>, <code>BrandSegmentCategories</code></td><td>Dropdown sources only</td><td>no</td><td>yes</td></tr>
-        </tbody>
-      </table></div>
-      <p><strong>Domain hierarchy.</strong> Bottler (the "customer") owns Payers. Payer owns Sales Centers. Programs belong to a Bottler. An Invoice references all of these plus Currency, Company and Country, and may point at a previous revision of itself through <code>RevisedInvoiceId</code>. The <code>Invoices.UserId</code> column is a required foreign key to <code>AspNetUsers</code>, a table this app does not manage, so new invoices default to the submitter of a recent invoice.</p>
-      <p><strong>Partial-class pattern.</strong> Files under <code>Data/Entities/Partials</code> add <code>[NotMapped]</code> members to scaffolded entities:</p>
-      <ul>
-        <li>Marker interfaces <code>ISoftDeletable</code> and <code>IAuditable</code> so <code>CrudService&lt;T&gt;</code> can treat soft delete and <code>UpdatedAt</code> stamping generically.</li>
-        <li>Typed enum views over <code>int</code> columns, for example <code>Invoice.Status</code> over <code>Invoice.InvoiceStatus</code>, using enums copied from the Invoice Portal backend.</li>
-        <li><code>DisplayName</code> helpers for dialogs and confirmations.</li>
-      </ul>
-      <p>The soft-delete filter is built as an expression against the real mapped <code>IsDeleted</code> column, handling both <code>bit</code> and nullable <code>bit</code>, so EF can translate it to SQL.</p>
-    </section>
-
-    <section id="flows">
-      <h2><span class="num">5</span>Data flows</h2>
-
-      <h3>5.1 Database provisioning (db-init, runs once)</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+    Req --&gt; SDK
+    Http --&gt; SDK
+    Sql --&gt; SDK
+    Chat --&gt; SDK
+    Own --&gt; SDK
+    Logs --&gt; SDK
+    Runtime --&gt; SDK
+    SDK -.-&gt;|&quot;Telemetry:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT&quot;| Otlp
+    SDK -.-&gt;|&quot;Telemetry:AzureMonitorConnectionString or the env var&quot;| AppInsights
+</pre></figure>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Signal</th>
+<th>Sources</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Traces</td>
+<td>ASP.NET Core (filtered by <code>TelemetryExtensions.IsNoiseRequest</code>), HttpClient, SqlClient, <code>InvoicePortal.Admin.Ai</code> (the <code>Microsoft.Extensions.AI</code> decorator, GenAI semantic conventions), <code>InvoicePortal.Admin</code> (own spans), plus the spans .NET 10 Blazor emits itself (<code>Event onclick -&gt; ...</code>, <code>Route ...</code>, <code>Circuit ...</code>). Head sampling <code>Telemetry:TraceSamplingRatio</code>, parent-based. <code>NoiseFilteringProcessor</code> un-records the per-hub-call plumbing spans (<code>ComponentHub/OnRenderCompleted</code>, <code>EndInvokeJSFromDotNet</code>, ...) that would otherwise produce dozens of one-span traces per click; it is a processor, not a sampler, because SignalR names the span only after it starts.</td>
+</tr>
+<tr>
+<td>Metrics</td>
+<td>ASP.NET Core and Kestrel, HttpClient, .NET runtime, <code>Microsoft.EntityFrameworkCore</code>, chat token usage and duration, <code>invoiceportal.ai.requests</code> (by <code>ai.feature</code> and <code>ai.outcome</code>), <code>invoiceportal.ai.query.rows</code>.</td>
+</tr>
+<tr>
+<td>Logs</td>
+<td>Every <code>ILogger</code> message, with formatted text, scopes and the current trace and span ids. Console logging stays on.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Exporters: OTLP (gRPC by default, <code>http/protobuf</code> optional) and Azure Monitor, each added only when its
+endpoint or connection string is present, so both can run together and neither runs by default. The Bicep
+template sets <code>APPLICATIONINSIGHTS_CONNECTION_STRING</code> on the container, so the Azure deployment reports to
+Application Insights with no further configuration. Locally, <code>docker compose --profile otel up -d</code> starts the
+standalone Aspire Dashboard as an in-memory OTLP sink on <a href="http://localhost:18888">http://localhost:18888</a>.</p>
+<p>Two privacy switches default to off because the database is a copy of production: <code>Telemetry:RecordSqlText</code>
+(statement text on database spans) and <code>Telemetry:RecordAiContent</code> (prompts and completions on chat spans).
+Span attributes otherwise carry only counts and lengths: prompt length, parameter count, row count, truncation,
+source and citation counts.</p>
+<p>The instrumentation calls in the AI services are <code>ActivitySource.StartActivity</code> and counter increments; when no
+listener is attached they return null and do nothing, which is also why the unit tests need no telemetry setup.</p>
+<p>A typical trace for one AI query, as shown by the Aspire Dashboard:</p>
+<pre class="code"><code>Event onclick -&gt; Radzen.Blazor.RadzenButton.OnClick     (Blazor, the user's click)
+├── ai.query.generate                                    (own span: prompt length, parameter count, model error flag)
+│   └── chat                                             (Microsoft.Extensions.AI: model id, token usage)
+└── ai.query.execute                                     (own span: row count, truncated)
+    └── SELECT Invoices Payers                           (SqlClient: db.query.summary, no statement text)</code></pre>
+<p>The hub call that delivered the click is not the parent: Blazor dispatches the event handler after the hub method
+returns, so the <code>Event</code> span is a trace root of its own, and the SignalR hub-method spans are dropped by the processor.</p>
+</section>
+<section id="data-model">
+<h2><span class="num">4</span>Data model</h2>
+<p>The EF Core model is scaffolded from the local database and never edited by hand (the re-scaffold command
+is in the README). Anything that must survive a re-scaffold lives in partial classes.</p>
+<p><strong>Tables in the model</strong> (nine of the many in the database):</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Table</th>
+<th>Role in the UI</th>
+<th>Soft delete</th>
+<th>Audit columns</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Invoices</code></td>
+<td>Full CRUD, tabbed dialog</td>
+<td><code>IsDeleted</code> (bit)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Bottlers</code></td>
+<td>CRUD (SAP-sourced ids)</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Payers</code></td>
+<td>CRUD (SAP-sourced ids)</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>SalesCenters</code></td>
+<td>CRUD (SAP-sourced ids)</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Programs</code></td>
+<td>CRUD</td>
+<td><code>IsDeleted</code> (nullable bit)</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Currencies</code></td>
+<td>CRUD</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>Companies</code>, <code>Countries</code>, <code>BrandSegmentCategories</code></td>
+<td>Dropdown sources only</td>
+<td>no</td>
+<td>yes</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Domain hierarchy</strong>: Bottler (the &quot;customer&quot;) owns Payers; Payer owns Sales Centers; Programs belong to a
+Bottler. An Invoice references all of these plus Currency, Company and Country, and may point at a previous
+revision of itself (<code>RevisedInvoiceId</code>). <code>Invoices.UserId</code> is a required foreign key to <code>AspNetUsers</code>, a
+table this app does not manage. New invoices therefore default to the submitter of a recent invoice.</p>
+<p><strong>Partial-class pattern.</strong> <code>Data/Entities/Partials/*.cs</code> add <code>[NotMapped]</code> members to scaffolded entities:</p>
+<ul>
+<li>Marker interfaces <code>ISoftDeletable</code> and <code>IAuditable</code> (in <code>Data/Abstractions</code>) so <code>CrudService&lt;T&gt;</code> can
+treat soft delete and <code>UpdatedAt</code> stamping generically.</li>
+<li>Typed enum views over <code>int</code> columns, for example <code>Invoice.Status</code> over <code>Invoice.InvoiceStatus</code>, using enums
+copied from the Invoice Portal backend (<code>Data/Enums</code>).</li>
+<li><code>DisplayName</code> helpers for dialogs and confirmations.</li>
+</ul>
+<p><code>SoftDelete.NotDeleted&lt;T&gt;()</code> builds the filter expression against the real mapped <code>IsDeleted</code> column
+(handling both <code>bit</code> and nullable <code>bit</code>) so EF can translate it to SQL.</p>
+</section>
+<section id="data-flows">
+<h2><span class="num">5</span>Data flows</h2>
+<h3>5.1 Database provisioning (db-init, runs once)</h3>
+<figure class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant C as docker compose
     participant I as db-init
@@ -419,14 +588,12 @@ sequenceDiagram
         end
         I-&gt;&gt;F: delete temp file
     end
-</pre>
-        <figcaption>Idempotent. Exits immediately when the database already exists.</figcaption>
-      </figure>
-      <p>The original bacpac is never modified. Azure SQL bacpacs contain Entra ID users, a master key, a scoped credential and the TDE flag, none of which an on-premises SQL Server can create, so the sanitiser strips them from <code>model.xml</code> and recomputes the checksum DacFx verifies.</p>
-
-      <h3>5.2 Grid load (server-side paging, sorting, filtering)</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+</pre></figure>
+<p>The original bacpac is never modified. Azure SQL bacpacs contain Entra ID users, a master key, a scoped
+credential and the TDE flag, none of which an on-premises SQL Server can create, so the sanitiser strips
+them from <code>model.xml</code> and recomputes the checksum DacFx verifies.</p>
+<h3>5.2 Grid load (server-side paging, sorting, filtering)</h3>
+<figure class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant G as RadzenDataGrid
     participant P as CrudPageBase
@@ -443,14 +610,12 @@ sequenceDiagram
     C-&gt;&gt;S: SELECT ... OFFSET/FETCH
     C--&gt;&gt;P: PagedResult(Items, Count)
     P--&gt;&gt;G: Items, Count
-</pre>
-        <figcaption>Two round trips per page: a count and a page.</figcaption>
-      </figure>
-      <p>Radzen's <code>LoadDataArgs</code> carries the grid state. Filtering uses Radzen's expression-based queryable extension, not Dynamic LINQ, so everything is translated to SQL. The Invoices page adds Includes for Bottler, Payer, Sales Center and Currency and an optional type filter inside <code>Shape</code>.</p>
-
-      <h3>5.3 Create, update, delete, restore</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+</pre></figure>
+<p>Radzen's <code>LoadDataArgs</code> carries the grid state. Filtering uses Radzen's expression-based
+<code>QueryableExtension</code> (no Dynamic LINQ), so everything is translated to SQL. The Invoices page adds an
+<code>Include</code> for Bottler, Payer, Sales Center and Currency and an optional type filter inside <code>Shape</code>.</p>
+<h3>5.3 Create, update, delete, restore</h3>
+<figure class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant Dlg as EditDialogBase / CrudPageBase
     participant C as CrudService(T)
@@ -471,24 +636,26 @@ sequenceDiagram
     C-&gt;&gt;S: SaveChangesAsync
     S--&gt;&gt;C: ok or SqlException
     C--&gt;&gt;Dlg: return, or CrudException with a friendly message
-</pre>
-        <figcaption>One short-lived context per write.</figcaption>
-      </figure>
-      <p><code>DetachNavigations</code> matters because grid rows arrive with navigation objects loaded. Attaching them would make EF try to track or insert the related lookup rows. SQL error numbers 2601 and 2627 (unique), 547 (foreign key) and 515 (not null) are translated into user-readable messages.</p>
-      <p>The edit dialog loads the entity by key on open, seeds defaults, loads dropdowns, and runs a validation hook (for example, duplicate SAP id checks) before saving. Cascading dropdowns (Bottler to Payers to Sales Centers, Bottler to Programs) are reloaded from <code>LookupService</code> as the parent selection changes.</p>
-
-      <h3>5.4 Lookup cache</h3>
-      <p><code>LookupService</code> runs small projection queries against the lookup tables and caches each result per circuit for 30 seconds, keyed by query name and parent id. <code>Invalidate()</code> clears the cache. It also reads the 50 most recent distinct invoice submitters to satisfy the <code>UserId</code> constraint.</p>
-
-      <h3>5.5 AI Insights: natural language to SQL</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+</pre></figure>
+<p><code>DetachNavigations</code> matters because grid rows arrive with navigation objects loaded; attaching them would
+make EF try to track or insert the related lookup rows. SQL error numbers 2601/2627 (unique), 547
+(foreign key) and 515 (not null) are translated into user-readable messages.</p>
+<p>The edit dialog itself loads the entity by key on open, seeds defaults through <code>CreateNew()</code>, loads
+dropdowns through <code>OnModelLoadedAsync()</code>, and runs <code>ValidateAsync()</code> (for example, duplicate SAP id checks)
+before saving. Cascading dropdowns (Bottler → Payers → Sales Centers, Bottler → Programs) are reloaded
+from <code>LookupService</code> as the parent selection changes.</p>
+<h3>5.4 Lookup cache</h3>
+<p><code>LookupService</code> runs small projection queries (<code>Id + &quot; - &quot; + Name</code>) against the lookup tables and caches
+each result per circuit for 30 seconds, keyed by query name and parent id. <code>Invalidate()</code> clears the
+cache. It also reads the 50 most recent distinct invoice submitters to satisfy the <code>UserId</code> constraint.</p>
+<h3>5.5 AI Insights: natural language to SQL</h3>
+<figure class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant U as AiQuery.razor
     participant Q as QueryGenerationService
     participant RL as AiRateLimiter
     participant SD as SchemaDescriber
-    participant M as IChatClient (MockChatClient)
+    participant M as IChatClient (provider)
     participant X as SqlQueryExecutor
     participant G as SqlGuard
     participant S as SQL Server
@@ -498,8 +665,8 @@ sequenceDiagram
     Q-&gt;&gt;RL: Acquire() (10 per minute per circuit)
     Q-&gt;&gt;SD: Describe() (EF model metadata, no DB call)
     Q-&gt;&gt;M: GetResponseAsync(System: schema + rules, User: prompt, Temperature 0)
-    Note over M: mock routes on the marker "T-SQL (SQL Server) SELECT"&lt;br/&gt;then SqlIntentCatalog regex, JSON in a json fence
-    M--&gt;&gt;Q: {"sql": "...", "paramValues": [...]} or {"error": "..."}
+    Note over M: Mock provider routes on the marker &quot;T-SQL (SQL Server) SELECT&quot;&lt;br/&gt;then SqlIntentCatalog regex, JSON in a json fence.&lt;br/&gt;Ollama and AzureOpenAI send the prompt to the model.
+    M--&gt;&gt;Q: {&quot;sql&quot;: &quot;...&quot;, &quot;paramValues&quot;: [...]} or {&quot;error&quot;: &quot;...&quot;}
     Q-&gt;&gt;Q: JsonExtraction.ExtractObject, then Parse (primitives only, max 50 params)
     Q--&gt;&gt;U: GeneratedQuery
     U-&gt;&gt;X: ExecuteAsync(GeneratedQuery)
@@ -510,22 +677,21 @@ sequenceDiagram
     S--&gt;&gt;X: rows (read up to MaxRows = 200, flag Truncated)
     X-&gt;&gt;S: ROLLBACK (always)
     X--&gt;&gt;U: QueryResult(Sql, ParamValues, Columns, Rows, Truncated)
-    U-&gt;&gt;U: build dynamic grid columns, hide "id", client-side text filter
-</pre>
-        <figcaption>Only the model is mocked. Prompt, parsing, guard and execution are production-shaped.</figcaption>
-      </figure>
-      <p>The mock deliberately wraps its JSON in a code fence so the real extraction path is exercised.</p>
-
-      <h3>5.6 Ask the documents: grounded Q&amp;A with citations</h3>
-      <figure class="diagram">
-<pre class="mermaid">
+    U-&gt;&gt;U: build dynamic grid columns, hide &quot;id&quot;, client-side text filter
+</pre></figure>
+<p>The prompt, JSON contract parsing, guard, and execution are the same for every provider. With <code>Mock</code> the
+model is fake, and it deliberately wraps its JSON in a code fence so the real extraction path is exercised.
+With <code>Ollama</code> or <code>AzureOpenAI</code> free-form questions work, and SQL the guard rejects is shown as an error
+rather than executed.</p>
+<h3>5.6 Ask the documents: grounded Q&amp;A with citations</h3>
+<figure class="diagram"><pre class="mermaid">
 sequenceDiagram
     participant U as AskDocumentsDialog
     participant D as DocumentAnswerService
     participant RL as AiRateLimiter
     participant R as InMemoryDocumentRetriever
     participant S as SQL Server
-    participant M as IChatClient (MockChatClient)
+    participant M as IChatClient (provider)
     participant C as CitationSelector
 
     U-&gt;&gt;D: AskAsync(question)
@@ -540,161 +706,423 @@ sequenceDiagram
     R-&gt;&gt;R: sort desc, dedupe by document, label S1..Sn, take RetrievalTopK (5)
     R--&gt;&gt;D: GroundingSource[]
     alt none
-        D--&gt;&gt;U: "No indexed documents matched your question."
+        D--&gt;&gt;U: &quot;No indexed documents matched your question.&quot;
     else
         D-&gt;&gt;M: GetResponseAsync(System: answer only from supplied sources and cite [S#], User: Question + Sources JSON)
-        Note over M: mock routes on the marker "supplied sources"&lt;br/&gt;then MockAnswerSynthesizer picks best sentences by token overlap
+        Note over M: Mock provider routes on the marker &quot;supplied sources&quot;&lt;br/&gt;then MockAnswerSynthesizer picks best sentences by token overlap.&lt;br/&gt;Real providers answer from the sources in the prompt.
         M--&gt;&gt;D: answer text with [S#] labels
         D-&gt;&gt;C: Select(answer, sources)
         Note over C: at least one citation, all labels in range,&lt;br/&gt;otherwise ModelResponseException
         C--&gt;&gt;D: Citation[] (first-use order, 240-char snippet)
         D--&gt;&gt;U: DocumentAnswer(Answer, Citations)
     end
-</pre>
-        <figcaption>Retrieve, prompt, validate citations. The index is built once per process.</figcaption>
-      </figure>
-      <p>Entry points: the header button in <code>MainLayout</code> (opens with the retriever's default question) and the per-row button on the Bottlers page, which pre-fills a question about that bottler.</p>
-    </section>
-
-    <section id="db">
-      <h2><span class="num">6</span>Database integration points</h2>
-      <p>All app-side access uses one connection string, <code>ConnectionStrings:InvoicePortal</code>, supplied as an environment variable in compose and from <code>appsettings.Development.json</code> for host-side runs. The login is <code>sa</code> with <code>Encrypt=True;TrustServerCertificate=True</code>.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Component</th><th>Mechanism</th><th>What it does</th></tr></thead>
-        <tbody>
-          <tr><td><code>InvoicePortal.DbInit</code></td><td><code>Microsoft.Data.SqlClient</code> to <code>master</code>, then DacFx</td><td>Readiness poll, <code>DB_ID</code> existence check, <code>ImportBacpac</code>, drop on failure. Reads <code>SQL_SERVER</code>, <code>SQL_PORT</code>, <code>DB_NAME</code>, <code>MSSQL_SA_PASSWORD</code>, <code>BACPAC_PATH</code>.</td></tr>
-          <tr><td><code>CrudService&lt;T&gt;</code></td><td>EF Core via <code>IDbContextFactory</code></td><td>Paged list, find, exists, count, insert, update, soft or hard delete, restore. <code>AsNoTracking</code> for reads.</td></tr>
-          <tr><td><code>LookupService</code></td><td>EF Core via factory</td><td>Projection queries for dropdowns, cached 30 s per circuit.</td></tr>
-          <tr><td><code>InMemoryDocumentRetriever</code></td><td>EF Core via factory, once</td><td>Loads four bottler names to fill document placeholders.</td></tr>
-          <tr><td><code>SqlQueryExecutor</code></td><td>ADO.NET on the EF connection (<code>GetDbConnection</code>)</td><td>Runs guarded, parameterised, model-generated SELECTs inside a transaction that is always rolled back.</td></tr>
-          <tr><td><code>SchemaDescriber</code></td><td>EF model metadata only</td><td>No connection. Builds the schema block of the NL-to-SQL prompt from the EF model.</td></tr>
-        </tbody>
-      </table></div>
-      <p>Resilience and safety settings:</p>
-      <ul>
-        <li><code>EnableRetryOnFailure(3)</code> on the EF provider for transient errors.</li>
-        <li>Generated SQL: 5 s command timeout, <code>SET LOCK_TIMEOUT 3000</code>, 200-row cap, ReadCommitted transaction rolled back in <code>finally</code>. SQL Server has no engine-level read-only transaction, so protection is guard-based. Beyond a local POC the executor should use a separate <code>db_datareader</code> login.</li>
-        <li>Column types returned by the executor are wrapped as nullable so null cells do not break Radzen's dynamic sort expressions.</li>
-      </ul>
-    </section>
-
-    <section id="ai">
-      <h2><span class="num">7</span>AI service integration points</h2>
-      <p>The AI slice is designed around two seams. Everything else (prompts, parsing, guards, citation validation, rate limiting, UI) is provider-agnostic.</p>
-
-      <h3>7.1 The two seams</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Seam</th><th>Interface</th><th>Mock implementation</th><th>Real analogue</th></tr></thead>
-        <tbody>
-          <tr><td>Chat model</td><td><code>Microsoft.Extensions.AI.IChatClient</code></td><td><code>Ai/Chat/MockChatClient.cs</code></td><td>Azure OpenAI or any <code>IChatClient</code> provider</td></tr>
-          <tr><td>Document retrieval</td><td><code>Ai/Documents/IDocumentRetriever</code></td><td><code>InMemoryDocumentRetriever</code></td><td>Azure AI Search knowledge base (Foundry IQ) retrieve endpoint</td></tr>
-        </tbody>
-      </table></div>
-      <p>Registration lives in <code>Ai/AiServiceCollectionExtensions.cs</code> and switches on <code>Ai:Provider</code>. Only <code>Mock</code> is registered. Any other value fails at start-up, and <code>AiOptions</code> also validates the value with a regular expression that currently allows only <code>Mock</code>.</p>
-
-      <h3>7.2 How the mock decides what to do</h3>
-      <p><code>MockChatClient</code> inspects the system prompt for a marker string:</p>
-      <ul>
-        <li><strong>"T-SQL (SQL Server) SELECT"</strong> routes to <code>SqlIntentCatalog</code>, a first-match-wins table of about a dozen regex intents that produce parameterised T-SQL in the exact JSON shape the real prompt demands. Unmatched prompts return an error object.</li>
-        <li><strong>"supplied sources"</strong> routes to <code>MockAnswerSynthesizer</code>, which parses the sources JSON out of the user message and stitches the most relevant sentences, citing <code>[S#]</code>.</li>
-      </ul>
-      <p>A real model never sees these markers as anything special. It simply follows the instructions.</p>
-
-      <h3>7.3 Prompt contracts (provider-independent)</h3>
-      <p><strong>NL-to-SQL.</strong> System prompt = schema block from <code>SchemaDescriber</code> + domain notes (soft-delete filters, hierarchy, status codes, bracketed <code>[From]</code> and <code>[To]</code> columns) + rules. Required reply:</p>
-<pre class="code"><code>{"sql": "&lt;T-SQL&gt;", "paramValues": [&lt;primitives&gt;]}
-{"error": "&lt;why&gt;"}</code></pre>
-      <p>Parsed by <code>JsonExtraction</code> (tolerates fences and prose) and <code>QueryGenerationService.Parse</code> (primitives only, at most 50 parameters).</p>
-      <p><strong>Grounded Q&amp;A.</strong> System prompt instructs the model to answer only from the supplied sources, treat source text as data rather than instructions, and cite every statement with <code>[S#]</code>. The user message is the question followed by a <code>Sources (JSON):</code> array of label, title, customer name, source path and content. <code>CitationSelector</code> rejects answers with no citation or an out-of-range label.</p>
-
-      <h3>7.4 Configuration</h3>
-      <p>Bound from the <code>Ai</code> section in <code>appsettings.json</code>, overridable with <code>Ai__*</code> environment variables.</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Key</th><th>Default</th><th>Effect</th></tr></thead>
-        <tbody>
-          <tr><td><code>Enabled</code></td><td class="num"><code>true</code></td><td>Hides the AI Insights nav item, the header button and the per-row button. <code>/ai/query</code> shows a warning.</td></tr>
-          <tr><td><code>DocumentChatEnabled</code></td><td class="num"><code>true</code></td><td>Gates the "Ask the documents" dialog only.</td></tr>
-          <tr><td><code>Provider</code></td><td class="num"><code>Mock</code></td><td>Provider switch. Only <code>Mock</code> is registered.</td></tr>
-          <tr><td><code>MaxPromptLength</code></td><td class="num">4000</td><td>Prompt and question length cap.</td></tr>
-          <tr><td><code>RateLimitPerMinute</code></td><td class="num">10</td><td>Fixed window per circuit, shared by both AI features.</td></tr>
-          <tr><td><code>MaxRows</code></td><td class="num">200</td><td>Row cap on generated SQL results.</td></tr>
-          <tr><td><code>CommandTimeoutSeconds</code></td><td class="num">5</td><td>Command timeout for generated SQL.</td></tr>
-          <tr><td><code>RetrievalTopK</code></td><td class="num">5</td><td>Maximum grounding sources after dedupe.</td></tr>
-          <tr><td><code>RetrievalMinScore</code></td><td class="num">1.0</td><td>BM25 threshold, analogue of a reranker threshold.</td></tr>
-        </tbody>
-      </table></div>
-
-      <h3>7.5 Swapping in a real provider</h3>
-      <ol class="steps">
-        <li>Add the provider package (for example <code>Microsoft.Extensions.AI.OpenAI</code> plus <code>Azure.AI.OpenAI</code>).</li>
-        <li>Add a <code>case</code> in <code>AddInvoicePortalAi</code> that calls <code>AddChatClient(...)</code> with the provider's client converted via <code>.AsIChatClient()</code>, keeping <code>.UseLogging()</code>.</li>
-        <li>Relax the <code>Provider</code> regular expression in <code>AiOptions</code>.</li>
-        <li>Optionally register a real <code>IDocumentRetriever</code> that calls a knowledge base and maps hits to <code>GroundingSource</code> (deduplicated, labelled S1..Sn).</li>
-        <li>Supply endpoint and credentials through configuration or managed identity. This is the first point at which the app would make an outbound network call, so review egress and data-handling policy first. The NL-to-SQL prompt contains the schema, and the Q&amp;A prompt contains document content.</li>
-      </ol>
-      <p>Nothing in the pages, services, guards or tests needs to change.</p>
-    </section>
-
-    <section id="config">
-      <h2><span class="num">8</span>Configuration and environments</h2>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Setting</th><th>Compose (<code>app</code>)</th><th>Host-side development</th></tr></thead>
-        <tbody>
-          <tr><td><code>ASPNETCORE_ENVIRONMENT</code></td><td><code>Production</code></td><td><code>Development</code> (launch profile <code>http</code>)</td></tr>
-          <tr><td><code>ConnectionStrings__InvoicePortal</code></td><td>env var, <code>Server=sql,1433</code></td><td><code>appsettings.Development.json</code>, <code>localhost,1433</code></td></tr>
-          <tr><td>HTTP port</td><td class="num">8080</td><td class="num">5098 (<code>.claude/launch.json</code>, profile <code>http</code>)</td></tr>
-          <tr><td><code>Ai__Enabled</code>, <code>Ai__DocumentChatEnabled</code>, <code>Ai__Provider</code></td><td>env vars in <code>docker-compose.yml</code></td><td><code>appsettings.json</code> defaults</td></tr>
-          <tr><td>SQL SA password, DB name</td><td><code>.env</code> (<code>MSSQL_SA_PASSWORD</code>, <code>DB_NAME</code>), read by compose</td><td>same password in <code>appsettings.Development.json</code></td></tr>
-        </tbody>
-      </table></div>
-      <div class="callout">
-        <span class="label">Action item</span>
-        <p>The <code>.env.Development</code> file in the repo root belongs to a different application (the Invoice Portal API). No code in this solution reads it. It contains credentials for external Azure resources and should be removed from the working tree or rotated. It is covered by <code>.gitignore</code> but still present on disk.</p>
-      </div>
-      <p><code>RequiresAspNetWebAssets=true</code> in the Admin project forces the SDK to restore the framework's Blazor web assets during the Docker build, which restores from the project file alone. Without it the published container returns 404 for <code>blazor.web.js</code> and no circuit starts.</p>
-    </section>
-
-    <section id="security">
-      <h2><span class="num">9</span>Security and safety posture</h2>
-      <ul>
-        <li><strong>Network.</strong> No outbound calls. The only listeners are the app on 8080 and SQL Server on 1433, both bound to the local host by compose.</li>
-        <li><strong>Identity.</strong> No authentication or authorization. The app uses the <code>sa</code> login. Acceptable only for a single-user local POC.</li>
-        <li><strong>Generated SQL.</strong> Defence in depth through <code>SqlGuard</code> (single SELECT, denylist, parameter naming, no comments or system variables), a short command and lock timeout, a row cap and an unconditional rollback. The guard is a regex allow and deny list, not a parser, so a dedicated read-only login is the recommended next layer.</li>
-        <li><strong>Prompt injection.</strong> The Q&amp;A system prompt tells the model to treat source text as data. Citation validation ensures the answer can only reference supplied sources. With a real model this remains a mitigation, not a guarantee.</li>
-        <li><strong>Data.</strong> The bacpac is a copy of production data, including user emails. It lives only in the Docker volume and the bind-mounted file, both excluded from git.</li>
-      </ul>
-    </section>
-
-    <section id="tests">
-      <h2><span class="num">10</span>Testing</h2>
-      <p><code>InvoicePortal.Admin.Tests</code> (xUnit) covers the AI slice without a database:</p>
-      <div class="table-wrap"><table>
-        <thead><tr><th>Test class</th><th>Covers</th></tr></thead>
-        <tbody>
-          <tr><td><code>SqlGuardTests</code></td><td>Accepts single parameterised SELECT or WITH. Rejects DML, DDL, comments, multiple statements, bad parameter names, <code>@@</code> variables.</td></tr>
-          <tr><td><code>QueryGenerationServiceTests</code></td><td>JSON contract parsing, fenced JSON, error objects, parameter limits, length and rate-limit rejections (via <code>StubChatClient</code>).</td></tr>
-          <tr><td><code>MockChatClientContractTests</code></td><td>The mock honours the same output contract a real model is instructed to follow.</td></tr>
-          <tr><td><code>InMemoryDocumentRetrieverTests</code></td><td>Ranking, customer boost, threshold, dedupe, labelling, TopK, fallback names.</td></tr>
-          <tr><td><code>CitationSelectorTests</code></td><td>Cited-only selection, ordering, rejection of missing or unknown labels.</td></tr>
-        </tbody>
-      </table></div>
+</pre></figure>
+<p>Entry points: the header button in <code>MainLayout</code> (opens with the retriever's default question) and the
+per-row button on the Bottlers page (pre-fills &quot;What do the documents say about {bottler}?&quot;).</p>
+</section>
+<section id="database-integration-points">
+<h2><span class="num">6</span>Database integration points</h2>
+<p>All app-side access uses one connection string, <code>ConnectionStrings:InvoicePortal</code>, supplied as an
+environment variable in compose and from <code>appsettings.Development.json</code> for host-side runs. The login is
+<code>sa</code> with <code>Encrypt=True;TrustServerCertificate=True</code>.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Mechanism</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>InvoicePortal.DbInit</code></td>
+<td><code>Microsoft.Data.SqlClient</code> to <code>master</code>; DacFx</td>
+<td>Readiness poll, <code>DB_ID</code> existence check, <code>ImportBacpac</code>, drop on failure. Reads <code>SQL_SERVER</code>, <code>SQL_PORT</code>, <code>DB_NAME</code>, <code>MSSQL_SA_PASSWORD</code>, <code>BACPAC_PATH</code>.</td>
+</tr>
+<tr>
+<td><code>CrudService&lt;T&gt;</code></td>
+<td>EF Core via <code>IDbContextFactory</code></td>
+<td>Paged list, find, exists, count, insert, update, soft/hard delete, restore. <code>AsNoTracking</code> for reads.</td>
+</tr>
+<tr>
+<td><code>LookupService</code></td>
+<td>EF Core via factory</td>
+<td>Projection queries for dropdowns, cached 30 s per circuit.</td>
+</tr>
+<tr>
+<td><code>InMemoryDocumentRetriever</code></td>
+<td>EF Core via factory, once</td>
+<td>Loads four bottler names to fill document placeholders.</td>
+</tr>
+<tr>
+<td><code>SqlQueryExecutor</code></td>
+<td>ADO.NET on the EF connection (<code>GetDbConnection</code>)</td>
+<td>Runs guarded, parameterised, model-generated SELECTs inside a transaction that is always rolled back.</td>
+</tr>
+<tr>
+<td><code>SchemaDescriber</code></td>
+<td>EF model metadata only</td>
+<td>No connection. Builds the schema block of the NL-to-SQL prompt from <code>IModel</code>.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Resilience and safety settings:</p>
+<ul>
+<li><code>EnableRetryOnFailure(3)</code> on the EF provider for transient errors.</li>
+<li>Generated SQL: 5 s command timeout, <code>SET LOCK_TIMEOUT 3000</code>, 200-row cap, <code>ReadCommitted</code> transaction
+rolled back in <code>finally</code>. SQL Server has no engine-level read-only transaction, so protection is
+guard-based. For anything beyond a local POC the executor should use a separate <code>db_datareader</code> login.</li>
+<li>Column types returned by the executor are wrapped as <code>Nullable&lt;T&gt;</code> so null cells do not break Radzen's
+dynamic sort expressions.</li>
+</ul>
+</section>
+<section id="ai-service-integration-points">
+<h2><span class="num">7</span>AI service integration points</h2>
+<p>The AI slice is designed around two seams. Everything else (prompts, parsing, guards, citation
+validation, rate limiting, UI) is provider-agnostic.</p>
+<h3>7.1 The two seams</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Seam</th>
+<th>Interface</th>
+<th>Implementations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Chat model</td>
+<td><code>Microsoft.Extensions.AI.IChatClient</code></td>
+<td><code>MockChatClient</code> (in-process), OllamaSharp's <code>OllamaApiClient</code> (local model), Azure OpenAI's chat client via <code>.AsIChatClient()</code></td>
+</tr>
+<tr>
+<td>Document retrieval</td>
+<td><code>Ai/Documents/IDocumentRetriever</code></td>
+<td><code>InMemoryDocumentRetriever</code> only. A real knowledge base (Azure AI Search / Foundry IQ) would be a second implementation.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Registration lives in <code>Ai/AiServiceCollectionExtensions.cs</code> and switches on <code>Ai:Provider</code>. <code>AiOptions</code>
+validates the value at start-up against the three registered names, so a typo fails fast rather than
+silently falling back to the mock.</p>
+<h3>7.2 Chat providers</h3>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Client and pipeline</th>
+<th>Network</th>
+<th>Credentials</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Mock</code></td>
+<td><code>MockChatClient</code> → <code>UseLogging</code></td>
+<td>None</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>Ollama</code></td>
+<td><code>OllamaApiClient(HttpClient, model)</code> → <code>ModelTransportChatClient</code> → <code>ConfigureOptions(num_ctx)</code> → <code>UseLogging</code></td>
+<td><code>Ai:Ollama:Endpoint</code> (host GPU install or the <code>ollama</code> compose service)</td>
+<td>None</td>
+</tr>
+<tr>
+<td><code>AzureOpenAI</code></td>
+<td><code>AzureOpenAIClient(endpoint, DefaultAzureCredential).GetChatClient(deployment).AsIChatClient()</code> → <code>ModelTransportChatClient</code> → <code>UseLogging</code></td>
+<td><code>Ai:AzureOpenAI:Endpoint</code></td>
+<td>Entra ID token: managed identity in Azure, <code>az login</code> on a laptop. The resource has local keys disabled.</td>
+</tr>
+</tbody>
+</table></div>
+<p><code>ModelTransportChatClient</code> is a <code>DelegatingChatClient</code> that converts transport failures into
+<code>ModelResponseException</code> with an actionable message: endpoint unreachable, model not pulled, HTTP 401/403/404/429
+from Azure OpenAI, or a timeout. The pages already catch <code>AiException</code>, so a misconfigured provider shows a
+readable error rather than a generic one. The Ollama pipeline also sets <code>num_ctx</code> from <code>Ai:Ollama:ContextLength</code>
+because Ollama's default context window is too small for the schema prompt plus a reply.</p>
+<h3>7.3 How the mock decides what to do</h3>
+<p><code>MockChatClient</code> inspects the system prompt for a marker string:</p>
+<ul>
+<li><code>&quot;T-SQL (SQL Server) SELECT&quot;</code> (from <code>QueryGenerationService.SystemPromptMarker</code>) → <code>SqlIntentCatalog</code>,
+a first-match-wins table of about a dozen regex intents that produce parameterised T-SQL in the exact
+JSON shape the real prompt demands. Unmatched prompts return <code>{&quot;error&quot;: ...}</code>.</li>
+<li><code>&quot;supplied sources&quot;</code> (from <code>DocumentAnswerService.SystemPromptMarker</code>) → <code>MockAnswerSynthesizer</code>, which
+parses the sources JSON out of the user message and stitches the most relevant sentences, citing <code>[S#]</code>.</li>
+</ul>
+<p>A real model never sees these markers as anything special; it simply follows the instructions.</p>
+<h3>7.4 Prompt contracts (provider-independent)</h3>
+<p><strong>NL-to-SQL.</strong> System prompt = schema block from <code>SchemaDescriber</code> + domain notes (soft-delete filters,
+hierarchy, status codes, bracketed <code>[From]</code>/<code>[To]</code> columns) + rules. Required reply:
+<code>{&quot;sql&quot;: &quot;&lt;T-SQL&gt;&quot;, &quot;paramValues&quot;: [&lt;primitives&gt;]}</code> or <code>{&quot;error&quot;: &quot;&lt;why&gt;&quot;}</code>. Parsed by <code>JsonExtraction</code>
+(tolerates fences and prose) and <code>QueryGenerationService.Parse</code> (primitives only, at most 50 parameters).</p>
+<p><strong>Grounded Q&amp;A.</strong> System prompt instructs the model to answer only from the supplied sources, treat source
+text as data rather than instructions, and cite every statement with <code>[S#]</code>. User message =
+<code>Question: ...</code> followed by <code>Sources (JSON):</code> and an array of <code>{Label, Title, CustomerName, SourcePath, Content}</code>. <code>CitationSelector</code> rejects answers with no citation or an out-of-range label.</p>
+<h3>7.5 Configuration</h3>
+<p>Bound from the <code>Ai</code> section (<code>appsettings.json</code>), overridable with <code>Ai__*</code> environment variables.</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Key</th>
+<th>Default</th>
+<th>Effect</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Enabled</code></td>
+<td><code>true</code></td>
+<td>Hides the AI Insights nav item, the header button and the per-row button; <code>/ai/query</code> shows a warning.</td>
+</tr>
+<tr>
+<td><code>DocumentChatEnabled</code></td>
+<td><code>true</code></td>
+<td>Gates the &quot;Ask the documents&quot; dialog only.</td>
+</tr>
+<tr>
+<td><code>Provider</code></td>
+<td><code>Mock</code></td>
+<td><code>Mock</code>, <code>Ollama</code> or <code>AzureOpenAI</code>. Anything else fails validation at start-up.</td>
+</tr>
+<tr>
+<td><code>Ollama:Endpoint</code></td>
+<td><code>http://localhost:11434</code></td>
+<td>Ollama base URL. Compose overrides it to <code>http://host.docker.internal:11434</code>.</td>
+</tr>
+<tr>
+<td><code>Ollama:Model</code></td>
+<td><code>qwen2.5-coder:7b</code></td>
+<td>Model tag. Must already be pulled.</td>
+</tr>
+<tr>
+<td><code>Ollama:TimeoutSeconds</code></td>
+<td>120</td>
+<td>Per-call HTTP timeout. CPU inference can take tens of seconds.</td>
+</tr>
+<tr>
+<td><code>Ollama:ContextLength</code></td>
+<td>8192</td>
+<td>Sent as <code>num_ctx</code>. The schema prompt needs more than Ollama's default.</td>
+</tr>
+<tr>
+<td><code>AzureOpenAI:Endpoint</code></td>
+<td>empty</td>
+<td>Required when the provider is <code>AzureOpenAI</code>. Set by the Bicep template in Azure.</td>
+</tr>
+<tr>
+<td><code>AzureOpenAI:Deployment</code></td>
+<td><code>gpt-4.1-mini</code></td>
+<td>Deployment name on the resource.</td>
+</tr>
+<tr>
+<td><code>MaxPromptLength</code></td>
+<td>4000</td>
+<td>Prompt / question length cap.</td>
+</tr>
+<tr>
+<td><code>RateLimitPerMinute</code></td>
+<td>10</td>
+<td>Fixed window per circuit, shared by both AI features.</td>
+</tr>
+<tr>
+<td><code>MaxRows</code></td>
+<td>200</td>
+<td>Row cap on generated SQL results.</td>
+</tr>
+<tr>
+<td><code>CommandTimeoutSeconds</code></td>
+<td>5</td>
+<td>Command timeout for generated SQL.</td>
+</tr>
+<tr>
+<td><code>RetrievalTopK</code></td>
+<td>5</td>
+<td>Maximum grounding sources after dedupe.</td>
+</tr>
+<tr>
+<td><code>RetrievalMinScore</code></td>
+<td>1.0</td>
+<td>BM25 threshold, analogue of a reranker threshold.</td>
+</tr>
+</tbody>
+</table></div>
+<h3>7.6 Adding another provider</h3>
+<ol class="steps">
+<li>Add the provider's <code>IChatClient</code> package.</li>
+<li>Add a <code>case</code> in <code>AddInvoicePortalAi</code> that calls <code>AddChatClient(...)</code>, wraps it in
+<code>ModelTransportChatClient</code> so transport errors stay readable, and keeps <code>.UseLogging()</code>.</li>
+<li>Add the name to the <code>Provider</code> regular expression in <code>AiOptions</code> and to <code>AiOptionsTests</code>.</li>
+<li>Optionally register a real <code>IDocumentRetriever</code> that calls a knowledge base and maps hits to
+<code>GroundingSource</code> (deduplicated, labelled <code>S1..Sn</code>).</li>
+</ol>
+<p>Nothing in the pages, services, guards or the rest of the tests needs to change. Any non-mock provider sends
+the schema (NL-to-SQL) and document content (Q&amp;A) to the model endpoint, so review where that endpoint is
+before enabling it outside the local machine.</p>
+</section>
+<section id="configuration-and-environments">
+<h2><span class="num">8</span>Configuration and environments</h2>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Compose (<code>app</code>)</th>
+<th>Host-side development</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>ASPNETCORE_ENVIRONMENT</code></td>
+<td><code>Production</code></td>
+<td><code>Development</code> (launch profile <code>http</code>)</td>
+</tr>
+<tr>
+<td><code>ConnectionStrings__InvoicePortal</code></td>
+<td>env var, <code>Server=sql,1433</code></td>
+<td><code>appsettings.Development.json</code>, <code>localhost,1433</code></td>
+</tr>
+<tr>
+<td>HTTP port</td>
+<td>8080</td>
+<td>5098 (<code>.claude/launch.json</code>, profile <code>http</code>)</td>
+</tr>
+<tr>
+<td><code>Ai__Enabled</code>, <code>Ai__DocumentChatEnabled</code></td>
+<td>env vars in <code>docker-compose.yml</code></td>
+<td><code>appsettings.json</code> defaults</td>
+</tr>
+<tr>
+<td><code>Ai__Provider</code>, <code>Ai__Ollama__Endpoint</code>, <code>Ai__Ollama__Model</code></td>
+<td>from <code>.env</code> (<code>AI_PROVIDER</code>, <code>AI_OLLAMA_ENDPOINT</code>, <code>AI_OLLAMA_MODEL</code>) with Mock / host Ollama defaults</td>
+<td><code>appsettings.json</code> defaults, or <code>Ai__Provider</code> set in the shell</td>
+</tr>
+<tr>
+<td>SQL SA password, DB name</td>
+<td><code>.env</code> (<code>MSSQL_SA_PASSWORD</code>, <code>DB_NAME</code>), read by compose</td>
+<td>same password hard-coded in <code>appsettings.Development.json</code></td>
+</tr>
+<tr>
+<td><code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, <code>Telemetry__RecordSqlText</code></td>
+<td>from <code>.env</code> (<code>OTEL_EXPORTER_OTLP_ENDPOINT</code>, <code>TELEMETRY_RECORD_SQL_TEXT</code>), empty / false by default</td>
+<td><code>Telemetry</code> section in <code>appsettings.json</code>, or <code>OTEL_EXPORTER_OTLP_ENDPOINT</code> set in the shell (<code>http://localhost:18889</code> for the dashboard)</td>
+</tr>
+<tr>
+<td><code>APPLICATIONINSIGHTS_CONNECTION_STRING</code></td>
+<td>not set</td>
+<td>not set; set by the Bicep template in Azure</td>
+</tr>
+</tbody>
+</table></div>
+<p><strong>Azure hosting.</strong> <code>azure.yaml</code> and <code>infra/*.bicep</code> describe an Azure Developer CLI deployment to Container
+Apps (one replica, sticky sessions and WebSockets for the Blazor circuit). The template provisions a container
+registry, a user-assigned managed identity, a storage account for the Data Protection key ring, Log Analytics
+and Application Insights, and optionally an Azure OpenAI resource with a <code>gpt-4.1-mini</code> deployment. It does not
+create or restore a database: the container is pointed at the existing Azure SQL database, and the managed
+identity is granted access with <code>infra/sql/create-app-user.sql</code>. The template sets <code>DataProtection__BlobUri</code>,
+<code>Ai__Provider=AzureOpenAI</code> and <code>Ai__AzureOpenAI__Endpoint</code> on the container, and can enable Entra ID sign-in
+(Easy Auth) when <code>ENTRA_CLIENT_ID</code> is supplied. <code>.github/workflows/azure-dev.yml</code> runs <code>azd provision</code> and
+<code>azd deploy</code> on pushes to <code>main</code> using OIDC; <code>ci.yml</code> builds, tests and validates Bicep on pull requests.
+Step-by-step instructions are in <code>docs/azure-deploy.md</code>.</p>
+<div class="callout"><span class="label">Action item</span><p>The <code>.env.Development</code> file in the repo root belongs to a different application (the
+Invoice Portal API). No code in this solution reads it. It contains credentials for external Azure
+resources and should be removed from the working tree or rotated. It is covered by <code>.gitignore</code> but
+still present on disk.</p>
+</div>
+<p><code>RequiresAspNetWebAssets=true</code> in the Admin project forces the SDK to restore the framework's Blazor web
+assets during the Docker build, which restores from the <code>.csproj</code> alone. Without it the published container
+returns 404 for <code>blazor.web.js</code> and no circuit starts.</p>
+</section>
+<section id="security-and-safety-posture">
+<h2><span class="num">9</span>Security and safety posture</h2>
+<ul>
+<li><strong>Network</strong>: with the default <code>Mock</code> provider there are no outbound calls. <code>Ollama</code> talks to a local
+endpoint (host or compose sidecar). <code>AzureOpenAI</code> sends prompts, which include the schema and document
+content, to the configured Azure OpenAI endpoint over HTTPS with an Entra ID token. The local listeners
+are the app on 8080, SQL Server on 1433 and, with the profile, Ollama on 11434.</li>
+<li><strong>Identity</strong>: locally there is no authentication or authorization, and the app uses the <code>sa</code> login. In
+Azure, Easy Auth with Entra ID is optional and the app reaches SQL, Blob Storage, the registry and Azure
+OpenAI through a managed identity with no stored keys. <code>/healthz</code> is unauthenticated in both cases.</li>
+<li><strong>Generated SQL</strong>: defence in depth through <code>SqlGuard</code> (single SELECT, denylist, parameter naming,
+no comments or system variables), a short command and lock timeout, a row cap and an unconditional
+rollback. The guard is a regex allow/deny list, not a parser, so a dedicated read-only login is the
+recommended next layer.</li>
+<li><strong>Prompt injection</strong>: the Q&amp;A system prompt tells the model to treat source text as data. Citation
+validation ensures the answer can only reference supplied sources. With a real model this remains a
+mitigation, not a guarantee.</li>
+<li><strong>Data</strong>: the bacpac is a copy of production data, including user emails. It lives only in the Docker
+volume and the bind-mounted file, both excluded from git.</li>
+<li><strong>Telemetry</strong>: nothing is exported unless an OTLP endpoint or an Application Insights connection string
+is configured. SQL statement text and prompt/completion content are excluded from spans unless
+<code>Telemetry:RecordSqlText</code> / <code>Telemetry:RecordAiContent</code> are switched on; the App Insights path in Azure
+therefore receives request, dependency and model-call timings and token counts, not data.</li>
+</ul>
+</section>
+<section id="testing">
+<h2><span class="num">10</span>Testing</h2>
+<p><code>InvoicePortal.Admin.Tests</code> (xUnit) covers the AI slice without a database:</p>
+<div class="table-wrap"><table>
+<thead>
+<tr>
+<th>Test class</th>
+<th>Covers</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SqlGuardTests</code></td>
+<td>Accepts single parameterised SELECT/WITH; rejects DML, DDL, comments, multiple statements, bad parameter names, <code>@@</code> variables.</td>
+</tr>
+<tr>
+<td><code>QueryGenerationServiceTests</code></td>
+<td>JSON contract parsing, fenced JSON, error objects, parameter limits, length and rate-limit rejections (via <code>StubChatClient</code>).</td>
+</tr>
+<tr>
+<td><code>MockChatClientContractTests</code></td>
+<td>The mock honours the same output contract a real model is instructed to follow.</td>
+</tr>
+<tr>
+<td><code>InMemoryDocumentRetrieverTests</code></td>
+<td>Ranking, customer boost, threshold, dedupe, labelling, TopK, fallback names.</td>
+</tr>
+<tr>
+<td><code>CitationSelectorTests</code></td>
+<td>Cited-only selection, ordering, rejection of missing or unknown labels.</td>
+</tr>
+<tr>
+<td><code>AiOptionsTests</code></td>
+<td>Only <code>Mock</code>, <code>Ollama</code> and <code>AzureOpenAI</code> pass validation; Ollama defaults point at a local coder model with a large enough context.</td>
+</tr>
+<tr>
+<td><code>TelemetryOptionsTests</code></td>
+<td>Defaults export nothing and record no SQL text or prompt content; OTLP protocol and sampling ratio validation; health probe and static assets are excluded from request tracing.</td>
+</tr>
+</tbody>
+</table></div>
+<p>Run with:</p>
 <pre class="code"><code>dotnet test InvoicePortal.slnx</code></pre>
-      <p>CRUD pages and services are exercised manually against the container. There are no integration tests.</p>
-    </section>
-
-    <section id="limits">
-      <h2><span class="num">11</span>Known limitations and extension points</h2>
-      <ul>
-        <li><strong>Scope.</strong> Nine tables. The database has many more (users, attachments, workflow, cancellation categories, samples purposes) that are visible only as foreign-key ids.</li>
-        <li><strong>Invoice submitter.</strong> <code>Invoices.UserId</code> is satisfied by borrowing a recent submitter because <code>AspNetUsers</code> is out of scope.</li>
-        <li><strong>Mock model.</strong> Understands only the regex intents in <code>SqlIntentCatalog</code>. Everything else returns the fallback error. The seeded document index has six documents.</li>
-        <li><strong>Lookup cache.</strong> Per circuit, time-based, not invalidated by edits from other sessions.</li>
-        <li><strong>Extension seams.</strong> <code>IChatClient</code>, <code>IDocumentRetriever</code>, the <code>OnModelCreatingPartial</code> hook in the context partial, and the <code>CrudPageBase</code> and <code>EditDialogBase</code> pair for adding another table (one grid page, one dialog, one partial class).</li>
-      </ul>
-    </section>
+<p>CRUD pages and services are exercised manually against the container; there are no integration tests.</p>
+</section>
+<section id="known-limitations-and-extension-points">
+<h2><span class="num">11</span>Known limitations and extension points</h2>
+<ul>
+<li><strong>Scope</strong>: nine tables. The database has many more (users, attachments, workflow, cancellation
+categories, samples purposes) that are visible only as foreign-key ids.</li>
+<li><strong><code>Invoices.UserId</code></strong>: satisfied by borrowing a recent submitter because <code>AspNetUsers</code> is out of scope.</li>
+<li><strong>Mock model</strong>: understands only the regex intents in <code>SqlIntentCatalog</code>; everything else returns the
+fallback error. Real providers remove that limit but add latency (seconds on a GPU, tens of seconds on
+CPU for Ollama) and, for Azure OpenAI, cost and egress.</li>
+<li><strong>Document index</strong>: always the six seeded documents, whichever chat provider is active. A real knowledge
+base needs a second <code>IDocumentRetriever</code>.</li>
+<li><strong>Lookup cache</strong>: per circuit, time-based, not invalidated by edits from other sessions.</li>
+<li><strong>Single replica</strong>: Blazor Server circuits are in-process, so the Azure template runs one replica with
+sticky sessions. Scaling out would need a SignalR backplane.</li>
+<li><strong>Extension seams</strong>: <code>IChatClient</code> (a new <code>case</code> in the provider switch), <code>IDocumentRetriever</code>,
+<code>OnModelCreatingPartial</code> in the context partial, and the <code>CrudPageBase</code>/<code>EditDialogBase</code> pair for adding
+another table (one grid page, one dialog, one partial class).</li>
+</ul>
+</section>
   </main>
 </div>
-
 <script src="https://cdn.jsdelivr.net/npm/mermaid@11.4.1/dist/mermaid.min.js"></script>
 <script>
   (function () {

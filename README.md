@@ -8,6 +8,7 @@ of the Invoice Portal database. Everything runs in Docker Compose:
 | `sql`     | SQL Server 2022 **Express** (`mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express`) |
 | `db-init` | One-shot .NET console app that restores `mec-invoiceportal-prod.bacpac` into `sql` (DacFx)  |
 | `app`     | The Blazor admin UI on <http://localhost:8080>                                              |
+| `aspire-dashboard` | Optional (`--profile otel`): local OpenTelemetry sink with a UI on <http://localhost:18888> |
 
 No connection to Azure is made by any of these. `.env.Development` in this folder is **not** read by
 any code; it was only used once, read-only, to inspect the schema.
@@ -56,7 +57,9 @@ those elements from `model.xml`, rewrites the checksum in `Origin.xml`, and impo
 ## Project layout
 
 Architecture, data flows and integration points are described in [ARCHITECTURE.md](ARCHITECTURE.md)
-(rendered copy with diagrams: [docs/ARCHITECTURE.html](docs/ARCHITECTURE.html)).
+(rendered copies with diagrams: [docs/ARCHITECTURE.html](docs/ARCHITECTURE.html) and
+[docs/ARCHITECTURE.pdf](docs/ARCHITECTURE.pdf), regenerated with `npm run build:pdf` in `docs/`, Node 18+;
+the `update-architecture` skill in `.claude/skills/` walks through keeping them current).
 
 ```
 InvoicePortal.slnx
@@ -73,6 +76,7 @@ InvoicePortal.Admin/
   Components/Shared/CrudPageBase.cs, EditDialogBase.cs   shared page / dialog behaviour
   Components/Pages/Invoices/, Components/Pages/Lookups/  one grid + one dialog per table
   Ai/                               AI slice: options, DI, mock model, NL-to-SQL guard/executor, document Q&A
+  Telemetry/                        OpenTelemetry wiring (traces, metrics, logs), options, own ActivitySource/Meter
   Components/Pages/Ai/              AiQuery.razor (NL query + dynamic grid), AskDocumentsDialog.razor
 InvoicePortal.Admin.Tests/          xUnit tests for the AI slice (no database needed)
 ```
@@ -117,15 +121,14 @@ Configuration (`appsettings.json`, overridable with environment variables as in 
 |----------------------------|---------|--------------------------------------------------------------|
 | `Ai__Enabled`              | `true`  | Hides all AI entry points and makes `/ai/query` refuse when false |
 | `Ai__DocumentChatEnabled`  | `true`  | Gates the "Ask the documents" dialog                         |
-| `Ai__Provider`             | `Mock`  | `Mock` (offline fake) or `Ollama` (real local model, below)  |
+| `Ai__Provider`             | `Mock`  | `Mock` (offline fake), `Ollama` (local model, below) or `AzureOpenAI` (Azure, see `docs/azure-deploy.md`) |
 | `Ai__Ollama__Endpoint`     | `http://localhost:11434` | Ollama base URL (`http://host.docker.internal:11434` from the app container) |
 | `Ai__Ollama__Model`        | `qwen2.5-coder:7b` | Model tag; must already be pulled                   |
 | `Ai__Ollama__TimeoutSeconds` | `120` | Per-call HTTP timeout                                          |
 | `Ai__Ollama__ContextLength` | `8192` | Ollama `num_ctx`; the schema prompt needs more than the default |
 
-Swapping in a cloud model is one more `case` in `Ai/AiServiceCollectionExtensions.cs` (call `AddChatClient(...)`
-with a real `IChatClient`, e.g. Azure OpenAI's `.AsIChatClient()`), plus a real `IDocumentRetriever` if you want
-Foundry IQ instead of the seeded index. Nothing else changes.
+The `AzureOpenAI` provider (Entra ID auth, no keys) is what the Azure deployment uses; a Foundry IQ knowledge
+base would be another `IDocumentRetriever` implementation in place of the seeded index. Nothing else changes.
 
 ### Running a real local model (Ollama)
 
@@ -176,6 +179,47 @@ Tests (no database needed):
 ```bash
 dotnet test InvoicePortal.slnx
 ```
+
+## Telemetry (OpenTelemetry)
+
+The app emits OpenTelemetry traces (requests, SQL commands, outgoing HTTP, one span per chat-model call with
+token usage, and its own `ai.query.generate` / `ai.query.execute` / `ai.documents.answer` spans), metrics
+(ASP.NET Core, runtime, EF Core, chat tokens, `invoiceportal.ai.requests`) and logs with trace ids. **By default
+nothing is exported.** Exporters switch on by configuration:
+
+| Setting                                 | Effect                                                                  |
+|-----------------------------------------|-------------------------------------------------------------------------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` (or `Telemetry__OtlpEndpoint`) | Send everything over OTLP (gRPC; set `Telemetry__OtlpProtocol=http/protobuf` for HTTP) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` (or `Telemetry__AzureMonitorConnectionString`) | Send everything to Application Insights. The Azure template sets this. |
+| `Telemetry__RecordSqlText`              | `false`: SQL statement text is **not** recorded on spans (the data is a production copy) |
+| `Telemetry__RecordAiContent`            | `false`: prompts and completions are **not** recorded on chat spans      |
+| `Telemetry__TraceSamplingRatio`         | `1.0`: head sampling for traces                                          |
+| `Telemetry__Enabled`                    | `true`: set `false` to register no OpenTelemetry at all                  |
+
+To look at it locally, start the standalone .NET Aspire Dashboard (in-memory, no storage) and point the app at it:
+
+```bash
+docker compose --profile otel up -d
+```
+
+Then set `OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889` in `.env`, run `docker compose up -d app`
+and open <http://localhost:18888>. Host-side, use the launch profile that already points at the dashboard:
+
+```bash
+dotnet run --project InvoicePortal.Admin --launch-profile http-otel
+```
+
+The dashboard shows traces (a `/ai/query` request → `ai.query.generate` → `chat mock-invoice-portal`
+→ `ai.query.execute` → the SQL command), the metrics above, and structured logs correlated by trace id.
+
+## Deploy to Azure (azd + GitHub Actions)
+
+`azure.yaml` and `infra/` follow the customer-insights pattern: the Azure Developer CLI provisions a Container
+Apps environment, registry, managed identity, Blob storage for Data Protection keys, App Insights and Azure
+OpenAI, then builds and deploys the container. The existing Azure SQL database is referenced, never created or
+restored. `.github/workflows/azure-dev.yml` runs the same `azd provision` / `azd deploy` on pushes to `main`
+with OIDC, and `ci.yml` builds, tests and validates on pull requests. Step-by-step, including the one-time SQL
+user and Entra sign-in setup, is in [docs/azure-deploy.md](docs/azure-deploy.md).
 
 ## Host-side development
 

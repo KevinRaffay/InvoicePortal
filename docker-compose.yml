@@ -58,6 +58,22 @@ services:
       Ai__Provider: ${AI_PROVIDER:-Mock}
       Ai__Ollama__Endpoint: ${AI_OLLAMA_ENDPOINT:-http://host.docker.internal:11434}
       Ai__Ollama__Model: ${AI_OLLAMA_MODEL:-qwen2.5-coder:7b}
+      # OpenTelemetry. Empty (default) exports nothing. With the otel profile below:
+      # OTEL_EXPORTER_OTLP_ENDPOINT=http://aspire-dashboard:18889 in .env, then open http://localhost:18888.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      Telemetry__RecordSqlText: ${TELEMETRY_RECORD_SQL_TEXT:-false}
+
+  # Optional local telemetry sink: the standalone .NET Aspire Dashboard (traces, metrics, structured logs).
+  # No storage; everything is in memory and gone when the container stops. Started only with --profile otel.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:latest
+    container_name: invoiceportal-otel
+    profiles: ["otel"]
+    ports:
+      - "18888:18888"   # dashboard UI
+      - "18889:18889"   # OTLP gRPC ingest (used by the app container and by host-side dotnet run)
+    environment:
+      DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
 
   # Optional, CPU-only local model inside Docker (no WSL/GPU needed). Started only with --profile ollama.
   # Needs the Docker Desktop VM raised to ~12 GB (Settings > Resources); a 7B model does not fit in 4 GB.

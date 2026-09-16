@@ -1,0 +1,66 @@
+# Provision + deploy with the Azure Developer CLI, in the shape `azd pipeline config` generates.
+#
+# One-time setup (creates the Entra app + federated credential and the AZURE_* repository variables):
+#   azd pipeline config --provider github
+# Then add these repository variables by hand: AZURE_SQL_SERVER_FQDN, AZURE_SQL_DATABASE_NAME,
+# ENTRA_CLIENT_ID (optional) and the secret ENTRA_CLIENT_SECRET (optional). See docs/azure-deploy.md.
+name: Deploy to Azure (azd)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+
+permissions:
+  id-token: write # OIDC token for azd auth login (no stored Azure credentials)
+  contents: read
+
+concurrency:
+  group: azd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: azure
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+      AZURE_SQL_SERVER_FQDN: ${{ vars.AZURE_SQL_SERVER_FQDN }}
+      AZURE_SQL_DATABASE_NAME: ${{ vars.AZURE_SQL_DATABASE_NAME }}
+      DEPLOY_OPENAI: ${{ vars.DEPLOY_OPENAI || 'true' }}
+      ENTRA_CLIENT_ID: ${{ vars.ENTRA_CLIENT_ID }}
+      ENTRA_CLIENT_SECRET: ${{ secrets.ENTRA_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install azd
+        uses: Azure/setup-azd@v2
+
+      - name: Log in with federated credentials
+        run: |
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider "github" \
+            --tenant-id "$AZURE_TENANT_ID"
+
+      - name: Provision infrastructure
+        run: azd provision --no-prompt
+
+      - name: Build, push and deploy the container
+        run: azd deploy --no-prompt
+
+      - name: Smoke test
+        run: |
+          url="$(azd env get-value SERVICE_APP_URI)"
+          echo "App: $url"
+          # With Easy Auth enabled the health endpoint redirects to sign-in (302); without it, 200.
+          code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 "$url/healthz")"
+          echo "GET /healthz -> $code"
+          case "$code" in 200|302) ;; *) echo "unexpected status"; exit 1 ;; esac

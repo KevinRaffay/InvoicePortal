@@ -5,14 +5,19 @@ proof of concept. It complements [README.md](README.md), which covers how to run
 
 The diagrams are Mermaid. If your Markdown viewer does not draw them, open
 [docs/ARCHITECTURE.html](docs/ARCHITECTURE.html) in a browser: it is the same content with the diagrams
-rendered (needs network access once to load mermaid.js from a CDN).
+rendered (needs network access once to load mermaid.js from a CDN). A PDF is at
+[docs/ARCHITECTURE.pdf](docs/ARCHITECTURE.pdf). Both are generated from this file; after editing, rebuild
+them with `npm run build:pdf` in the `docs/` folder (see `docs/package.json`).
 
 **One-paragraph summary.** A .NET 10 Blazor Web App (Interactive Server render mode, Radzen components)
 administers a local copy of the Invoice Portal database. The database is SQL Server 2022 Express running in
 Docker, populated once from a production bacpac by a one-shot console app. All data access goes through an
 EF Core scaffolded model behind a `DbContext` factory. Two AI features, natural-language-to-SQL and grounded
-document Q&A, are built on the `Microsoft.Extensions.AI` abstractions with every external model and index
-replaced by an in-process mock. Nothing calls out to Azure or any other network service.
+document Q&A, are built on the `Microsoft.Extensions.AI` abstractions. The chat model is pluggable: the default
+`Mock` provider is an in-process fake that needs no network, `Ollama` talks to a local model, and `AzureOpenAI`
+talks to an Azure OpenAI deployment with Entra ID credentials. The document index is always in-process. An
+`azd` template under `infra/` can host the container in Azure Container Apps against the existing Azure SQL
+database. With the defaults, nothing leaves the machine.
 
 ---
 
@@ -27,9 +32,11 @@ flowchart LR
         Init["db-init<br/>InvoicePortal.DbInit<br/>one-shot, DacFx"]
     end
     Bacpac["mec-invoiceportal-prod.bacpac<br/>(read-only bind mount)"]
+    Model["Chat model (optional)<br/>Ollama on the host or the ollama profile,<br/>or an Azure OpenAI deployment"]
 
     Browser <-->|"HTTP + WebSocket"| App
     App -->|"EF Core / ADO.NET (TDS)"| Sql
+    App -.->|"IChatClient, only when Ai:Provider is not Mock"| Model
     Init -->|"SqlClient + DacFx import"| Sql
     Bacpac -.->|"mounted at /bacpac/source.bacpac"| Init
 ```
@@ -41,10 +48,13 @@ Compose start-up ordering is enforced with health conditions: `db-init` waits fo
 |-----------|--------------------------------------------|------------------------------------------------------------------|
 | `sql`     | `mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express` | Database engine. Data persists in the `mssql-data` volume. |
 | `db-init` | `InvoicePortal.DbInit/Dockerfile`          | Sanitises and imports the bacpac if the database does not exist. |
-| `app`     | `InvoicePortal.Admin/Dockerfile`           | The admin UI. HTTP only, port 8080.                              |
+| `app`     | `InvoicePortal.Admin/Dockerfile`           | The admin UI. HTTP only, port 8080. Exposes `/healthz`.          |
+| `ollama`  | `ollama/ollama:latest`, profile `ollama` only | Optional CPU-only local model. Started with `--profile ollama`; data in the `ollama-data` volume. |
+| `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard:latest`, profile `otel` only | Optional in-memory OTLP sink with a UI on 18888 (see 3.4). Started with `--profile otel`. |
 
-There is no authentication or authorization layer in the app. It is intended for a single developer on a
-local machine.
+Locally there is no authentication or authorization layer in the app. It is intended for a single developer
+on a local machine. The Azure deployment (section 8) can put Entra ID sign-in in front of the container with
+Easy Auth, without application code changes.
 
 ---
 
@@ -58,8 +68,13 @@ InvoicePortal.slnx
 │   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
 │   ├── Services/                  CrudService<T>, LookupService, EnumDisplay
 │   ├── Data/                      EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions
-│   └── Ai/                        AI slice: options, DI, Chat (mock), Query (NL->SQL), Documents (RAG)
-└── InvoicePortal.Admin.Tests/     xUnit tests for the AI slice, no database required
+│   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL->SQL), Documents (RAG)
+│   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
+├── InvoicePortal.Admin.Tests/     xUnit tests for the AI slice, no database required
+├── docs/                          this document's rendered copy + build script, Azure deployment guide
+├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
+├── azure.yaml                     Azure Developer CLI (azd) service definition
+└── .github/workflows/             ci.yml (build, test, Bicep validation) and azure-dev.yml (azd provision + deploy)
 ```
 
 Key packages:
@@ -68,7 +83,14 @@ Key packages:
 |--------------------------------------|----------|------------------------------------------------------|
 | `Microsoft.EntityFrameworkCore.SqlServer` | 10.0.12 | Data access                                     |
 | `Radzen.Blazor`                      | 11.4.0   | Grids, dialogs, forms, notifications                 |
-| `Microsoft.Extensions.AI` (+ Abstractions) | 10.10.0 | `IChatClient` seam, logging decorator          |
+| `Microsoft.Extensions.AI` (+ Abstractions) | 10.10.0 | `IChatClient` seam, pipeline builder, logging decorator |
+| `OllamaSharp`                        | 5.4.30   | `IChatClient` for a local Ollama server (`Ollama` provider) |
+| `Azure.AI.OpenAI`, `Microsoft.Extensions.AI.OpenAI` | 2.1.0, 10.10.0 | `IChatClient` for Azure OpenAI (`AzureOpenAI` provider) |
+| `Azure.Identity`                     | 1.21.0   | `DefaultAzureCredential` for Azure OpenAI and Blob Storage |
+| `Azure.Extensions.AspNetCore.DataProtection.Blobs` | 1.5.4 | Data Protection key ring in Blob Storage when hosted in Azure |
+| `OpenTelemetry.Extensions.Hosting` + `Instrumentation.AspNetCore`, `.Http`, `.SqlClient`, `.Runtime` | 1.18.0 | Traces, metrics and logs (section 3.4) |
+| `OpenTelemetry.Exporter.OpenTelemetryProtocol` | 1.18.0 | OTLP export to the Aspire Dashboard or any collector |
+| `Azure.Monitor.OpenTelemetry.Exporter` | 1.9.0  | Export to Application Insights when hosted in Azure  |
 | `Microsoft.SqlServer.DacFx`          | 170.5.76 | Bacpac import (DbInit only)                          |
 
 ---
@@ -83,10 +105,10 @@ flowchart TB
         Pages["Pages: Invoices, Bottlers, Payers,<br/>SalesCenters, Programs, Currencies"]
         Dialogs["Edit dialogs (one per table)"]
         AiPages["AiQuery.razor, AskDocumentsDialog.razor"]
-        Bases["CrudPageBase&lt;T,TDialog&gt;<br/>EditDialogBase&lt;T&gt;"]
+        Bases["CrudPageBase(T, TDialog)<br/>EditDialogBase(T)"]
     end
     subgraph Services["Services"]
-        Crud["CrudService&lt;T&gt;"]
+        Crud["CrudService(T)"]
         Lookup["LookupService (30 s cache)"]
     end
     subgraph AI["Ai slice"]
@@ -94,10 +116,10 @@ flowchart TB
         Exec["SqlQueryExecutor"]
         DocSvc["DocumentAnswerService"]
         Retriever["IDocumentRetriever<br/>(InMemoryDocumentRetriever)"]
-        Chat["IChatClient<br/>(MockChatClient)"]
+        Chat["IChatClient<br/>(Mock, Ollama or AzureOpenAI)"]
     end
     subgraph Data["Data"]
-        Factory["IDbContextFactory&lt;InvoicePortalDbContext&gt;"]
+        Factory["IDbContextFactory of InvoicePortalDbContext"]
         Ctx["InvoicePortalDbContext<br/>(scaffolded + partials)"]
     end
     Sql[("SQL Server")]
@@ -124,8 +146,11 @@ Blazor Server keeps one DI scope per SignalR circuit, so "scoped" here means "pe
 | `IDbContextFactory<InvoicePortalDbContext>`    | Singleton factory | Contexts are created per operation and disposed immediately. `EnableRetryOnFailure(3)`. |
 | `CrudService<T>` (open generic)                | Scoped    | One per entity type per circuit.                                                      |
 | `LookupService`                                | Scoped    | Dropdown sources cached per circuit for 30 seconds.                                   |
-| `IChatClient`                                  | Singleton | `MockChatClient` wrapped with `.UseLogging()`.                                        |
-| `IDocumentRetriever`                           | Singleton | Index built lazily on first use.                                                      |
+| `IChatClient`                                  | Singleton | Provider-dependent pipeline chosen by `Ai:Provider` (see 7.2). Always ends in `.UseOpenTelemetry()` then `.UseLogging()`. |
+| OpenTelemetry providers                        | Singleton | `AddOpenTelemetry()` with tracing, metrics and logging (see 3.4). Skipped entirely when `Telemetry:Enabled` is false. |
+| `IDocumentRetriever`                           | Singleton | `InMemoryDocumentRetriever` for every provider. Index built lazily on first use.     |
+| Health checks                                  | n/a       | `AddHealthChecks()` mapped at `/healthz` for container probes.                        |
+| Data Protection                                | Singleton | Only when `DataProtection:BlobUri` is set: key ring persisted to Blob Storage with `DefaultAzureCredential`, so antiforgery tokens survive container restarts. Locally the default file store is used. |
 | `SchemaDescriber`                              | Singleton | Schema text derived from EF model metadata, cached.                                   |
 | `AiRateLimiter`                                | Scoped    | Fixed window, default 10 requests per minute per circuit.                             |
 | `IQueryGenerationService`, `ISqlQueryExecutor`, `IDocumentAnswerService` | Scoped | Stateless orchestration.                          |
@@ -140,6 +165,70 @@ Every grid page inherits `CrudPageBase<TEntity, TDialog>` and every edit dialog 
 `EditDialogBase<TEntity>`. Pages supply only the Radzen markup and a few overrides (`EntityName`, `KeyOf`,
 `Shape` for `Include`s, `DialogWidth`). The bases provide server-side `LoadData`, Add/Edit through a
 dialog, Delete with confirmation, Restore, the "Show deleted" toggle, and notifications.
+
+### 3.4 Observability (OpenTelemetry)
+
+`Telemetry/TelemetryExtensions.cs` registers one OpenTelemetry pipeline for traces, metrics and logs. It is
+always on in-process; what leaves the process is decided by configuration.
+
+```mermaid
+flowchart LR
+    subgraph app["InvoicePortal.Admin"]
+        Req["ASP.NET Core requests<br/>(minus /healthz and static assets)"]
+        Http["HttpClient<br/>(Ollama, Azure OpenAI, Blob)"]
+        Sql["SqlClient commands<br/>(EF Core + guarded executor)"]
+        Chat["IChatClient.UseOpenTelemetry<br/>(one chat span per model call, token usage)"]
+        Own["ActivitySource InvoicePortal.Admin<br/>ai.query.generate, ai.query.execute, ai.documents.answer"]
+        Logs["ILogger (with trace/span ids)"]
+        Runtime[".NET runtime + EF Core meters"]
+        SDK["OpenTelemetry SDK<br/>resource: service.name, version, instance, environment"]
+    end
+    Otlp["OTLP endpoint<br/>Aspire Dashboard (compose profile otel),<br/>or any collector"]
+    AppInsights["Application Insights<br/>(APPLICATIONINSIGHTS_CONNECTION_STRING)"]
+
+    Req --> SDK
+    Http --> SDK
+    Sql --> SDK
+    Chat --> SDK
+    Own --> SDK
+    Logs --> SDK
+    Runtime --> SDK
+    SDK -.->|"Telemetry:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT"| Otlp
+    SDK -.->|"Telemetry:AzureMonitorConnectionString or the env var"| AppInsights
+```
+
+| Signal  | Sources                                                                                                          |
+|---------|------------------------------------------------------------------------------------------------------------------|
+| Traces  | ASP.NET Core (filtered by `TelemetryExtensions.IsNoiseRequest`), HttpClient, SqlClient, `InvoicePortal.Admin.Ai` (the `Microsoft.Extensions.AI` decorator, GenAI semantic conventions), `InvoicePortal.Admin` (own spans), plus the spans .NET 10 Blazor emits itself (`Event onclick -> ...`, `Route ...`, `Circuit ...`). Head sampling `Telemetry:TraceSamplingRatio`, parent-based. `NoiseFilteringProcessor` un-records the per-hub-call plumbing spans (`ComponentHub/OnRenderCompleted`, `EndInvokeJSFromDotNet`, ...) that would otherwise produce dozens of one-span traces per click; it is a processor, not a sampler, because SignalR names the span only after it starts. |
+| Metrics | ASP.NET Core and Kestrel, HttpClient, .NET runtime, `Microsoft.EntityFrameworkCore`, chat token usage and duration, `invoiceportal.ai.requests` (by `ai.feature` and `ai.outcome`), `invoiceportal.ai.query.rows`. |
+| Logs    | Every `ILogger` message, with formatted text, scopes and the current trace and span ids. Console logging stays on. |
+
+Exporters: OTLP (gRPC by default, `http/protobuf` optional) and Azure Monitor, each added only when its
+endpoint or connection string is present, so both can run together and neither runs by default. The Bicep
+template sets `APPLICATIONINSIGHTS_CONNECTION_STRING` on the container, so the Azure deployment reports to
+Application Insights with no further configuration. Locally, `docker compose --profile otel up -d` starts the
+standalone Aspire Dashboard as an in-memory OTLP sink on <http://localhost:18888>.
+
+Two privacy switches default to off because the database is a copy of production: `Telemetry:RecordSqlText`
+(statement text on database spans) and `Telemetry:RecordAiContent` (prompts and completions on chat spans).
+Span attributes otherwise carry only counts and lengths: prompt length, parameter count, row count, truncation,
+source and citation counts.
+
+The instrumentation calls in the AI services are `ActivitySource.StartActivity` and counter increments; when no
+listener is attached they return null and do nothing, which is also why the unit tests need no telemetry setup.
+
+A typical trace for one AI query, as shown by the Aspire Dashboard:
+
+```
+Event onclick -> Radzen.Blazor.RadzenButton.OnClick     (Blazor, the user's click)
+├── ai.query.generate                                    (own span: prompt length, parameter count, model error flag)
+│   └── chat                                             (Microsoft.Extensions.AI: model id, token usage)
+└── ai.query.execute                                     (own span: row count, truncated)
+    └── SELECT Invoices Payers                           (SqlClient: db.query.summary, no statement text)
+```
+
+The hub call that delivered the click is not the parent: Blazor dispatches the event handler after the hub method
+returns, so the `Event` span is a trace root of its own, and the SignalR hub-method spans are dropped by the processor.
 
 ---
 
@@ -190,7 +279,7 @@ sequenceDiagram
     participant F as sanitised bacpac (temp)
 
     C->>I: start (after sql healthy)
-    I->>I: check /proc/meminfo >= 2 GB
+    I->>I: check /proc/meminfo is at least 2 GB
     I->>I: check BACPAC_PATH exists
     loop up to 3 min
         I->>S: SELECT 1
@@ -200,10 +289,10 @@ sequenceDiagram
         I-->>C: exit 0 (nothing to do)
     else
         I->>F: BacpacSanitizer.Create(source, temp)
-        Note over F: remove SqlUser, SqlRoleMembership,<br/>SqlPermissionStatement, SqlDatabaseCredential,<br/>SqlMasterKey from model.xml;<br/>IsEncryptionOn=False; rewrite SHA-256 in Origin.xml
+        Note over F: remove SqlUser, SqlRoleMembership,<br/>SqlPermissionStatement, SqlDatabaseCredential,<br/>SqlMasterKey from model.xml.<br/>Set IsEncryptionOn=False.<br/>Rewrite SHA-256 in Origin.xml
         I->>S: DacServices.ImportBacpac(temp, DB_NAME)
         alt import fails
-            I->>S: ALTER DATABASE SET SINGLE_USER; DROP DATABASE
+            I->>S: ALTER DATABASE SET SINGLE_USER, then DROP DATABASE
             I-->>C: exit 1
         else
             I-->>C: exit 0
@@ -222,16 +311,16 @@ them from `model.xml` and recomputes the checksum DacFx verifies.
 sequenceDiagram
     participant G as RadzenDataGrid
     participant P as CrudPageBase
-    participant C as CrudService&lt;T&gt;
+    participant C as CrudService(T)
     participant D as DbContext (from factory)
     participant S as SQL Server
 
     G->>P: LoadData(LoadDataArgs: Filters, OrderBy, Skip, Top)
     P->>C: LoadAsync(args, ShowDeleted, Shape)
     C->>D: CreateDbContextAsync
-    C->>C: Set&lt;T&gt;().AsNoTracking() → Shape() (Includes) → NotDeleted filter → Radzen filter expression
+    C->>C: AsNoTracking, Shape() Includes, NotDeleted filter, Radzen filter expression
     C->>S: SELECT COUNT(*)
-    C->>C: OrderBy(args.OrderBy) or DefaultOrder → Skip → Take
+    C->>C: OrderBy(args.OrderBy) or DefaultOrder, then Skip and Take
     C->>S: SELECT ... OFFSET/FETCH
     C-->>P: PagedResult(Items, Count)
     P-->>G: Items, Count
@@ -246,24 +335,24 @@ Radzen's `LoadDataArgs` carries the grid state. Filtering uses Radzen's expressi
 ```mermaid
 sequenceDiagram
     participant Dlg as EditDialogBase / CrudPageBase
-    participant C as CrudService&lt;T&gt;
+    participant C as CrudService(T)
     participant D as DbContext
     participant S as SQL Server
 
     Dlg->>C: InsertAsync / UpdateAsync / DeleteAsync / RestoreAsync(entity)
     C->>D: CreateDbContextAsync
     C->>C: DetachNavigations (null out Bottler, Payer, ...)
-    alt Update / soft delete / restore
-        C->>C: UpdatedAt = UtcNow; Attach; State = Modified
-        C->>C: unmark computed + store-generated columns, keep CreatedAt
+    alt Update, soft delete or restore
+        C->>C: UpdatedAt = UtcNow, Attach, State = Modified
+        C->>C: unmark computed and store-generated columns, keep CreatedAt
     else Insert
         C->>C: Add(entity)
     else Hard delete (not ISoftDeletable)
         C->>C: Remove(entity)
     end
     C->>S: SaveChangesAsync
-    S-->>C: ok / SqlException
-    C-->>Dlg: return / CrudException(friendly message)
+    S-->>C: ok or SqlException
+    C-->>Dlg: return, or CrudException with a friendly message
 ```
 
 `DetachNavigations` matters because grid rows arrive with navigation objects loaded; attaching them would
@@ -289,33 +378,35 @@ sequenceDiagram
     participant Q as QueryGenerationService
     participant RL as AiRateLimiter
     participant SD as SchemaDescriber
-    participant M as IChatClient (MockChatClient)
+    participant M as IChatClient (provider)
     participant X as SqlQueryExecutor
     participant G as SqlGuard
     participant S as SQL Server
 
     U->>Q: GenerateAsync(prompt)
-    Q->>Q: trim; reject if empty or > MaxPromptLength (4000)
-    Q->>RL: Acquire() (10/min per circuit)
+    Q->>Q: trim, reject if empty or over MaxPromptLength (4000)
+    Q->>RL: Acquire() (10 per minute per circuit)
     Q->>SD: Describe() (EF model metadata, no DB call)
-    Q->>M: GetResponseAsync([System: schema + rules], [User: prompt], Temperature 0)
-    Note over M: mock routes on the marker "T-SQL (SQL Server) SELECT"<br/>→ SqlIntentCatalog regex → JSON in a ```json fence
+    Q->>M: GetResponseAsync(System: schema + rules, User: prompt, Temperature 0)
+    Note over M: Mock provider routes on the marker "T-SQL (SQL Server) SELECT"<br/>then SqlIntentCatalog regex, JSON in a json fence.<br/>Ollama and AzureOpenAI send the prompt to the model.
     M-->>Q: {"sql": "...", "paramValues": [...]} or {"error": "..."}
-    Q->>Q: JsonExtraction.ExtractObject → Parse (primitives only, ≤ 50 params)
+    Q->>Q: JsonExtraction.ExtractObject, then Parse (primitives only, max 50 params)
     Q-->>U: GeneratedQuery
     U->>X: ExecuteAsync(GeneratedQuery)
     X->>G: Validate(sql, params)
-    Note over G: single SELECT/WITH; no ; -- /*;<br/>keyword denylist; only @p0..@pN; no @@vars
-    X->>S: open connection; BEGIN TRAN (ReadCommitted)
-    X->>S: SET LOCK_TIMEOUT 3000; &lt;sql&gt; with @p0..@pN (CommandTimeout 5 s)
+    Note over G: single SELECT or WITH, no comments or extra statements,<br/>keyword denylist, only @p0..@pN, no @@ variables
+    X->>S: open connection, BEGIN TRAN (ReadCommitted)
+    X->>S: SET LOCK_TIMEOUT 3000 then the validated SQL with @p0..@pN (CommandTimeout 5 s)
     S-->>X: rows (read up to MaxRows = 200, flag Truncated)
     X->>S: ROLLBACK (always)
     X-->>U: QueryResult(Sql, ParamValues, Columns, Rows, Truncated)
-    U->>U: build dynamic RadzenDataGrid columns; hide "id"; client-side text filter
+    U->>U: build dynamic grid columns, hide "id", client-side text filter
 ```
 
-The prompt, JSON contract parsing, guard, and execution are production-shaped. Only the model is fake.
-The mock deliberately wraps its JSON in a code fence so the real extraction path is exercised.
+The prompt, JSON contract parsing, guard, and execution are the same for every provider. With `Mock` the
+model is fake, and it deliberately wraps its JSON in a code fence so the real extraction path is exercised.
+With `Ollama` or `AzureOpenAI` free-form questions work, and SQL the guard rejects is shown as an error
+rather than executed.
 
 ### 5.6 Ask the documents: grounded Q&A with citations
 
@@ -326,28 +417,28 @@ sequenceDiagram
     participant RL as AiRateLimiter
     participant R as InMemoryDocumentRetriever
     participant S as SQL Server
-    participant M as IChatClient (MockChatClient)
+    participant M as IChatClient (provider)
     participant C as CitationSelector
 
     U->>D: AskAsync(question)
-    D->>D: trim; reject if empty or > MaxPromptLength
+    D->>D: trim, reject if empty or over MaxPromptLength
     D->>RL: Acquire()
     D->>R: RetrieveAsync(question)
     opt first call only (Lazy index)
         R->>S: top 4 bottler names by non-deleted invoice count (3 s timeout, fallback to fictional names)
-        R->>R: SeedDocuments.Build → TextChunker → Bm25Scorer
+        R->>R: SeedDocuments.Build, TextChunker, Bm25Scorer
     end
-    R->>R: tokenize; BM25 + 2.0 customer-name boost; drop below RetrievalMinScore (1.0)
-    R->>R: sort desc; dedupe by document; label S1..Sn; take RetrievalTopK (5)
+    R->>R: tokenize, BM25 + 2.0 customer-name boost, drop below RetrievalMinScore (1.0)
+    R->>R: sort desc, dedupe by document, label S1..Sn, take RetrievalTopK (5)
     R-->>D: GroundingSource[]
     alt none
         D-->>U: "No indexed documents matched your question."
     else
-        D->>M: GetResponseAsync([System: answer only from supplied sources, cite [S#]], [User: Question + Sources (JSON)])
-        Note over M: mock routes on the marker "supplied sources"<br/>→ MockAnswerSynthesizer picks best sentences by token overlap
+        D->>M: GetResponseAsync(System: answer only from supplied sources and cite [S#], User: Question + Sources JSON)
+        Note over M: Mock provider routes on the marker "supplied sources"<br/>then MockAnswerSynthesizer picks best sentences by token overlap.<br/>Real providers answer from the sources in the prompt.
         M-->>D: answer text with [S#] labels
         D->>C: Select(answer, sources)
-        Note over C: ≥ 1 citation, all labels in range, else ModelResponseException
+        Note over C: at least one citation, all labels in range,<br/>otherwise ModelResponseException
         C-->>D: Citation[] (first-use order, 240-char snippet)
         D-->>U: DocumentAnswer(Answer, Citations)
     end
@@ -391,16 +482,30 @@ validation, rate limiting, UI) is provider-agnostic.
 
 ### 7.1 The two seams
 
-| Seam                 | Interface                          | Mock implementation           | Real analogue                                   |
-|----------------------|------------------------------------|-------------------------------|-------------------------------------------------|
-| Chat model           | `Microsoft.Extensions.AI.IChatClient` | `Ai/Chat/MockChatClient.cs` | Azure OpenAI / any `IChatClient` provider       |
-| Document retrieval   | `Ai/Documents/IDocumentRetriever`  | `InMemoryDocumentRetriever`   | Azure AI Search knowledge base (Foundry IQ) retrieve endpoint |
+| Seam                 | Interface                          | Implementations                                   |
+|----------------------|------------------------------------|---------------------------------------------------|
+| Chat model           | `Microsoft.Extensions.AI.IChatClient` | `MockChatClient` (in-process), OllamaSharp's `OllamaApiClient` (local model), Azure OpenAI's chat client via `.AsIChatClient()` |
+| Document retrieval   | `Ai/Documents/IDocumentRetriever`  | `InMemoryDocumentRetriever` only. A real knowledge base (Azure AI Search / Foundry IQ) would be a second implementation. |
 
-Registration lives in `Ai/AiServiceCollectionExtensions.cs` and switches on `Ai:Provider`. Only `Mock` is
-registered; any other value fails at start-up, and `AiOptions` also validates the value with a regular
-expression that currently allows only `Mock`.
+Registration lives in `Ai/AiServiceCollectionExtensions.cs` and switches on `Ai:Provider`. `AiOptions`
+validates the value at start-up against the three registered names, so a typo fails fast rather than
+silently falling back to the mock.
 
-### 7.2 How the mock decides what to do
+### 7.2 Chat providers
+
+| Provider      | Client and pipeline                                                                                   | Network                                   | Credentials                       |
+|---------------|-------------------------------------------------------------------------------------------------------|-------------------------------------------|-----------------------------------|
+| `Mock`        | `MockChatClient` → `UseLogging`                                                                        | None                                      | None                              |
+| `Ollama`      | `OllamaApiClient(HttpClient, model)` → `ModelTransportChatClient` → `ConfigureOptions(num_ctx)` → `UseLogging` | `Ai:Ollama:Endpoint` (host GPU install or the `ollama` compose service) | None                              |
+| `AzureOpenAI` | `AzureOpenAIClient(endpoint, DefaultAzureCredential).GetChatClient(deployment).AsIChatClient()` → `ModelTransportChatClient` → `UseLogging` | `Ai:AzureOpenAI:Endpoint` | Entra ID token: managed identity in Azure, `az login` on a laptop. The resource has local keys disabled. |
+
+`ModelTransportChatClient` is a `DelegatingChatClient` that converts transport failures into
+`ModelResponseException` with an actionable message: endpoint unreachable, model not pulled, HTTP 401/403/404/429
+from Azure OpenAI, or a timeout. The pages already catch `AiException`, so a misconfigured provider shows a
+readable error rather than a generic one. The Ollama pipeline also sets `num_ctx` from `Ai:Ollama:ContextLength`
+because Ollama's default context window is too small for the schema prompt plus a reply.
+
+### 7.3 How the mock decides what to do
 
 `MockChatClient` inspects the system prompt for a marker string:
 
@@ -412,7 +517,7 @@ expression that currently allows only `Mock`.
 
 A real model never sees these markers as anything special; it simply follows the instructions.
 
-### 7.3 Prompt contracts (provider-independent)
+### 7.4 Prompt contracts (provider-independent)
 
 **NL-to-SQL.** System prompt = schema block from `SchemaDescriber` + domain notes (soft-delete filters,
 hierarchy, status codes, bracketed `[From]`/`[To]` columns) + rules. Required reply:
@@ -424,35 +529,40 @@ text as data rather than instructions, and cite every statement with `[S#]`. Use
 `Question: ...` followed by `Sources (JSON):` and an array of `{Label, Title, CustomerName, SourcePath,
 Content}`. `CitationSelector` rejects answers with no citation or an out-of-range label.
 
-### 7.4 Configuration
+### 7.5 Configuration
 
 Bound from the `Ai` section (`appsettings.json`), overridable with `Ai__*` environment variables.
 
-| Key                    | Default | Effect                                                                    |
-|------------------------|---------|---------------------------------------------------------------------------|
-| `Enabled`              | `true`  | Hides the AI Insights nav item, the header button and the per-row button; `/ai/query` shows a warning. |
-| `DocumentChatEnabled`  | `true`  | Gates the "Ask the documents" dialog only.                                 |
-| `Provider`             | `Mock`  | Provider switch. Only `Mock` is registered.                                |
-| `MaxPromptLength`      | 4000    | Prompt / question length cap.                                              |
-| `RateLimitPerMinute`   | 10      | Fixed window per circuit, shared by both AI features.                      |
-| `MaxRows`              | 200     | Row cap on generated SQL results.                                          |
-| `CommandTimeoutSeconds`| 5       | Command timeout for generated SQL.                                         |
-| `RetrievalTopK`        | 5       | Maximum grounding sources after dedupe.                                    |
-| `RetrievalMinScore`    | 1.0     | BM25 threshold, analogue of a reranker threshold.                          |
+| Key                        | Default                    | Effect                                                                    |
+|----------------------------|----------------------------|---------------------------------------------------------------------------|
+| `Enabled`                  | `true`                     | Hides the AI Insights nav item, the header button and the per-row button; `/ai/query` shows a warning. |
+| `DocumentChatEnabled`      | `true`                     | Gates the "Ask the documents" dialog only.                                 |
+| `Provider`                 | `Mock`                     | `Mock`, `Ollama` or `AzureOpenAI`. Anything else fails validation at start-up. |
+| `Ollama:Endpoint`          | `http://localhost:11434`   | Ollama base URL. Compose overrides it to `http://host.docker.internal:11434`. |
+| `Ollama:Model`             | `qwen2.5-coder:7b`         | Model tag. Must already be pulled.                                         |
+| `Ollama:TimeoutSeconds`    | 120                        | Per-call HTTP timeout. CPU inference can take tens of seconds.             |
+| `Ollama:ContextLength`     | 8192                       | Sent as `num_ctx`. The schema prompt needs more than Ollama's default.     |
+| `AzureOpenAI:Endpoint`     | empty                      | Required when the provider is `AzureOpenAI`. Set by the Bicep template in Azure. |
+| `AzureOpenAI:Deployment`   | `gpt-4.1-mini`             | Deployment name on the resource.                                           |
+| `MaxPromptLength`          | 4000                       | Prompt / question length cap.                                              |
+| `RateLimitPerMinute`       | 10                         | Fixed window per circuit, shared by both AI features.                      |
+| `MaxRows`                  | 200                        | Row cap on generated SQL results.                                          |
+| `CommandTimeoutSeconds`    | 5                          | Command timeout for generated SQL.                                         |
+| `RetrievalTopK`            | 5                          | Maximum grounding sources after dedupe.                                    |
+| `RetrievalMinScore`        | 1.0                        | BM25 threshold, analogue of a reranker threshold.                          |
 
-### 7.5 Swapping in a real provider
+### 7.6 Adding another provider
 
-1. Add the provider package (for example `Microsoft.Extensions.AI.OpenAI` plus `Azure.AI.OpenAI`).
-2. Add a `case` in `AddInvoicePortalAi` that calls `AddChatClient(...)` with the provider's client
-   converted via `.AsIChatClient()`, keeping `.UseLogging()`.
-3. Relax the `Provider` regular expression in `AiOptions`.
+1. Add the provider's `IChatClient` package.
+2. Add a `case` in `AddInvoicePortalAi` that calls `AddChatClient(...)`, wraps it in
+   `ModelTransportChatClient` so transport errors stay readable, and keeps `.UseLogging()`.
+3. Add the name to the `Provider` regular expression in `AiOptions` and to `AiOptionsTests`.
 4. Optionally register a real `IDocumentRetriever` that calls a knowledge base and maps hits to
    `GroundingSource` (deduplicated, labelled `S1..Sn`).
-5. Supply endpoint and credentials through configuration or managed identity. This is the first point at
-   which the app would make an outbound network call, so review egress and data-handling policy first:
-   the NL-to-SQL prompt contains the schema, and the Q&A prompt contains document content.
 
-Nothing in the pages, services, guards or tests needs to change.
+Nothing in the pages, services, guards or the rest of the tests needs to change. Any non-mock provider sends
+the schema (NL-to-SQL) and document content (Q&A) to the model endpoint, so review where that endpoint is
+before enabling it outside the local machine.
 
 ---
 
@@ -463,12 +573,27 @@ Nothing in the pages, services, guards or tests needs to change.
 | `ASPNETCORE_ENVIRONMENT`            | `Production`                                      | `Development` (launch profile `http`)          |
 | `ConnectionStrings__InvoicePortal`  | env var, `Server=sql,1433`                        | `appsettings.Development.json`, `localhost,1433` |
 | HTTP port                           | 8080                                              | 5098 (`.claude/launch.json`, profile `http`)   |
-| `Ai__Enabled`, `Ai__DocumentChatEnabled`, `Ai__Provider` | env vars in `docker-compose.yml` | `appsettings.json` defaults              |
+| `Ai__Enabled`, `Ai__DocumentChatEnabled` | env vars in `docker-compose.yml`              | `appsettings.json` defaults                     |
+| `Ai__Provider`, `Ai__Ollama__Endpoint`, `Ai__Ollama__Model` | from `.env` (`AI_PROVIDER`, `AI_OLLAMA_ENDPOINT`, `AI_OLLAMA_MODEL`) with Mock / host Ollama defaults | `appsettings.json` defaults, or `Ai__Provider` set in the shell |
 | SQL SA password, DB name            | `.env` (`MSSQL_SA_PASSWORD`, `DB_NAME`), read by compose | same password hard-coded in `appsettings.Development.json` |
+| `OTEL_EXPORTER_OTLP_ENDPOINT`, `Telemetry__RecordSqlText` | from `.env` (`OTEL_EXPORTER_OTLP_ENDPOINT`, `TELEMETRY_RECORD_SQL_TEXT`), empty / false by default | `Telemetry` section in `appsettings.json`, or `OTEL_EXPORTER_OTLP_ENDPOINT` set in the shell (`http://localhost:18889` for the dashboard) |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | not set                                       | not set; set by the Bicep template in Azure     |
 
-The `.env.Development` file in the repo root belongs to a different application (the Invoice Portal API).
-No code in this solution reads it. It contains credentials for external Azure resources and should be
-removed from the working tree or rotated; it is covered by `.gitignore` but still present on disk.
+**Azure hosting.** `azure.yaml` and `infra/*.bicep` describe an Azure Developer CLI deployment to Container
+Apps (one replica, sticky sessions and WebSockets for the Blazor circuit). The template provisions a container
+registry, a user-assigned managed identity, a storage account for the Data Protection key ring, Log Analytics
+and Application Insights, and optionally an Azure OpenAI resource with a `gpt-4.1-mini` deployment. It does not
+create or restore a database: the container is pointed at the existing Azure SQL database, and the managed
+identity is granted access with `infra/sql/create-app-user.sql`. The template sets `DataProtection__BlobUri`,
+`Ai__Provider=AzureOpenAI` and `Ai__AzureOpenAI__Endpoint` on the container, and can enable Entra ID sign-in
+(Easy Auth) when `ENTRA_CLIENT_ID` is supplied. `.github/workflows/azure-dev.yml` runs `azd provision` and
+`azd deploy` on pushes to `main` using OIDC; `ci.yml` builds, tests and validates Bicep on pull requests.
+Step-by-step instructions are in `docs/azure-deploy.md`.
+
+> **Action item.** The `.env.Development` file in the repo root belongs to a different application (the
+> Invoice Portal API). No code in this solution reads it. It contains credentials for external Azure
+> resources and should be removed from the working tree or rotated. It is covered by `.gitignore` but
+> still present on disk.
 
 `RequiresAspNetWebAssets=true` in the Admin project forces the SDK to restore the framework's Blazor web
 assets during the Docker build, which restores from the `.csproj` alone. Without it the published container
@@ -478,10 +603,13 @@ returns 404 for `blazor.web.js` and no circuit starts.
 
 ## 9. Security and safety posture
 
-- **Network**: no outbound calls. The only listeners are the app on 8080 and SQL Server on 1433, both
-  bound to the local host by compose.
-- **Identity**: no authentication or authorization. The app uses the `sa` login. Acceptable only for a
-  single-user local POC.
+- **Network**: with the default `Mock` provider there are no outbound calls. `Ollama` talks to a local
+  endpoint (host or compose sidecar). `AzureOpenAI` sends prompts, which include the schema and document
+  content, to the configured Azure OpenAI endpoint over HTTPS with an Entra ID token. The local listeners
+  are the app on 8080, SQL Server on 1433 and, with the profile, Ollama on 11434.
+- **Identity**: locally there is no authentication or authorization, and the app uses the `sa` login. In
+  Azure, Easy Auth with Entra ID is optional and the app reaches SQL, Blob Storage, the registry and Azure
+  OpenAI through a managed identity with no stored keys. `/healthz` is unauthenticated in both cases.
 - **Generated SQL**: defence in depth through `SqlGuard` (single SELECT, denylist, parameter naming,
   no comments or system variables), a short command and lock timeout, a row cap and an unconditional
   rollback. The guard is a regex allow/deny list, not a parser, so a dedicated read-only login is the
@@ -491,6 +619,10 @@ returns 404 for `blazor.web.js` and no circuit starts.
   mitigation, not a guarantee.
 - **Data**: the bacpac is a copy of production data, including user emails. It lives only in the Docker
   volume and the bind-mounted file, both excluded from git.
+- **Telemetry**: nothing is exported unless an OTLP endpoint or an Application Insights connection string
+  is configured. SQL statement text and prompt/completion content are excluded from spans unless
+  `Telemetry:RecordSqlText` / `Telemetry:RecordAiContent` are switched on; the App Insights path in Azure
+  therefore receives request, dependency and model-call timings and token counts, not data.
 
 ---
 
@@ -505,6 +637,8 @@ returns 404 for `blazor.web.js` and no circuit starts.
 | `MockChatClientContractTests`       | The mock honours the same output contract a real model is instructed to follow. |
 | `InMemoryDocumentRetrieverTests`    | Ranking, customer boost, threshold, dedupe, labelling, TopK, fallback names. |
 | `CitationSelectorTests`             | Cited-only selection, ordering, rejection of missing or unknown labels. |
+| `AiOptionsTests`                    | Only `Mock`, `Ollama` and `AzureOpenAI` pass validation; Ollama defaults point at a local coder model with a large enough context. |
+| `TelemetryOptionsTests`             | Defaults export nothing and record no SQL text or prompt content; OTLP protocol and sampling ratio validation; health probe and static assets are excluded from request tracing. |
 
 Run with:
 
@@ -522,8 +656,13 @@ CRUD pages and services are exercised manually against the container; there are 
   categories, samples purposes) that are visible only as foreign-key ids.
 - **`Invoices.UserId`**: satisfied by borrowing a recent submitter because `AspNetUsers` is out of scope.
 - **Mock model**: understands only the regex intents in `SqlIntentCatalog`; everything else returns the
-  fallback error. The seeded document index has six documents.
+  fallback error. Real providers remove that limit but add latency (seconds on a GPU, tens of seconds on
+  CPU for Ollama) and, for Azure OpenAI, cost and egress.
+- **Document index**: always the six seeded documents, whichever chat provider is active. A real knowledge
+  base needs a second `IDocumentRetriever`.
 - **Lookup cache**: per circuit, time-based, not invalidated by edits from other sessions.
-- **Extension seams**: `IChatClient`, `IDocumentRetriever`, `OnModelCreatingPartial` in the context
-  partial, and the `CrudPageBase`/`EditDialogBase` pair for adding another table (one grid page, one
-  dialog, one partial class).
+- **Single replica**: Blazor Server circuits are in-process, so the Azure template runs one replica with
+  sticky sessions. Scaling out would need a SignalR backplane.
+- **Extension seams**: `IChatClient` (a new `case` in the provider switch), `IDocumentRetriever`,
+  `OnModelCreatingPartial` in the context partial, and the `CrudPageBase`/`EditDialogBase` pair for adding
+  another table (one grid page, one dialog, one partial class).

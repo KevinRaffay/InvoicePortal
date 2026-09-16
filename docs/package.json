@@ -1,0 +1,19 @@
+{
+  "name": "invoiceportal-docs",
+  "private": true,
+  "type": "module",
+  "description": "Builds docs/ARCHITECTURE.html and docs/ARCHITECTURE.pdf from ARCHITECTURE.md in the repo root.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node build.js",
+    "build:pdf": "node build.js --pdf",
+    "check": "node build.js --check",
+    "preview": "node serve.cjs 8090"
+  },
+  "devDependencies": {
+    "markdown-it": "^15.0.2",
+    "puppeteer-core": "^25.11.0"
+  }
+}

@@ -1,3 +1,4 @@
+using System.ClientModel;
 using Microsoft.Extensions.AI;
 using OllamaSharp.Models.Exceptions;
 
@@ -17,15 +18,20 @@ public sealed class ModelTransportChatClient(IChatClient inner, string endpoint,
         }
         catch (HttpRequestException ex)
         {
-            throw new ModelResponseException($"The local model endpoint {endpoint} could not be reached ({ex.Message}). Is Ollama running?");
+            throw new ModelResponseException($"The model endpoint {endpoint} could not be reached ({ex.Message}). Is the model server running?");
         }
         catch (OllamaException ex)
         {
             throw new ModelResponseException($"Ollama rejected the request for model '{model}': {ex.Message}. Has the model been pulled?");
         }
+        catch (ClientResultException ex)
+        {
+            // Azure OpenAI / OpenAI SDK: 401/403 (identity lacks the OpenAI User role), 404 (deployment name), 429 (quota).
+            throw new ModelResponseException($"The model service rejected the request for '{model}' (HTTP {ex.Status}): {ex.Message}");
+        }
         catch (TaskCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new ModelResponseException($"The local model '{model}' timed out. CPU-only inference can be slow; raise Ai:Ollama:TimeoutSeconds or use a smaller model.");
+            throw new ModelResponseException($"The local model '{model}' timed out. For Ollama on CPU, raise Ai:Ollama:TimeoutSeconds or use a smaller model.");
         }
     }
 }

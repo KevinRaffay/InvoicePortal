@@ -95,11 +95,13 @@ public sealed class LookupService(IDbContextFactory<InvoicePortalDbContext> fact
     public Task<IReadOnlyList<InvoiceUser>> RecentInvoiceUsersAsync() => Cached("invoiceusers", async db =>
         (IReadOnlyList<InvoiceUser>)await db.Invoices.AsNoTracking()
             .Where(i => i.UserEmail != "")
-            .GroupBy(i => new { i.UserId, i.UserName, i.UserEmail })
-            .Select(g => new { g.Key, Last = g.Max(i => i.CreatedAt) })
-            .OrderByDescending(x => x.Last)
+            .Where(i => !db.Invoices.Any(other =>
+                other.UserId == i.UserId
+                && (other.CreatedAt > i.CreatedAt
+                    || (other.CreatedAt == i.CreatedAt && other.Id > i.Id))))
+            .OrderByDescending(i => i.CreatedAt)
             .Take(50)
-            .Select(x => new InvoiceUser(x.Key.UserId, x.Key.UserName, x.Key.UserEmail))
+            .Select(i => new InvoiceUser(i.UserId, i.UserName, i.UserEmail))
             .ToListAsync());
 
     public static IReadOnlyList<Option<string>> InvoiceTypes { get; } =

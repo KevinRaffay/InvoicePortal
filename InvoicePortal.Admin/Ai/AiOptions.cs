@@ -18,14 +18,17 @@ public sealed class AiOptions
     public bool DocumentChatEnabled { get; set; } = true;
 
     /// <summary>
-    /// "Mock" (default; deterministic fake, offline) or "Ollama" (a real local model behind the same
-    /// <c>IChatClient</c>). A cloud provider is one extra case in AiServiceCollectionExtensions.
+    /// "Mock" (default; deterministic fake, offline), "Ollama" (a real local model) or "AzureOpenAI"
+    /// (what infra/ provisions). All sit behind the same <c>IChatClient</c>.
     /// </summary>
-    [Required, RegularExpression("^(Mock|Ollama)$", ErrorMessage = "Ai:Provider must be 'Mock' or 'Ollama'.")]
+    [Required, RegularExpression("^(Mock|Ollama|AzureOpenAI)$", ErrorMessage = "Ai:Provider must be 'Mock', 'Ollama' or 'AzureOpenAI'.")]
     public string Provider { get; set; } = "Mock";
 
-    /// <summary>Settings for the Ollama provider (ignored when Provider is Mock).</summary>
+    /// <summary>Settings for the Ollama provider (ignored otherwise).</summary>
     public OllamaOptions Ollama { get; set; } = new();
+
+    /// <summary>Settings for the AzureOpenAI provider (ignored otherwise).</summary>
+    public AzureOpenAIOptions AzureOpenAI { get; set; } = new();
 
     [Range(1, 20000)] public int MaxPromptLength { get; set; } = 4000;
     [Range(1, 1000)] public int RateLimitPerMinute { get; set; } = 10;
@@ -53,4 +56,16 @@ public sealed class OllamaOptions
 
     /// <summary>Ollama's default context is too small for the schema prompt plus a reply; this sets num_ctx.</summary>
     [Range(1024, 131072)] public int ContextLength { get; set; } = 8192;
+}
+
+/// <summary>
+/// Azure OpenAI resource provisioned by infra/resources.bicep. Authentication is Entra ID via
+/// <c>DefaultAzureCredential</c>: the container's managed identity in Azure, your <c>az login</c> locally.
+/// </summary>
+public sealed class AzureOpenAIOptions
+{
+    /// <summary>Resource endpoint, e.g. https://oai-xxxx.openai.azure.com/. Required when the provider is AzureOpenAI.</summary>
+    public string Endpoint { get; set; } = string.Empty;
+
+    [Required] public string Deployment { get; set; } = "gpt-4.1-mini";
 }

@@ -10,6 +10,16 @@
           "ASPNETCORE_ENVIRONMENT": "Development"
         }
       },
+      "http-otel": {
+        "commandName": "Project",
+        "dotnetRunMessages": true,
+        "launchBrowser": true,
+        "applicationUrl": "http://localhost:5098",
+        "environmentVariables": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:18889"
+        }
+      },
       "https": {
         "commandName": "Project",
         "dotnetRunMessages": true,

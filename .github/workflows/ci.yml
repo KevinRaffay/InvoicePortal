@@ -1,0 +1,51 @@
+# Build, test, validate the Bicep and prove the Docker image builds. No Azure access needed.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches-ignore: [main] # main is covered by azure-dev.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore
+        run: dotnet restore InvoicePortal.slnx
+
+      - name: Build
+        run: dotnet build InvoicePortal.slnx --no-restore -c Release
+
+      - name: Test (no database required)
+        run: dotnet test InvoicePortal.slnx --no-build -c Release --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/TestResults/*.trx'
+
+  bicep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Bicep
+        run: az bicep build --file infra/main.bicep --stdout > /dev/null
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f InvoicePortal.Admin/Dockerfile -t invoiceportal-admin:ci .

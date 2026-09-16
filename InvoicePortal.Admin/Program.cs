@@ -2,6 +2,9 @@ using InvoicePortal.Admin.Ai;
 using InvoicePortal.Admin.Components;
 using InvoicePortal.Admin.Data;
 using InvoicePortal.Admin.Services;
+using InvoicePortal.Admin.Telemetry;
+using Azure.Identity;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
 
@@ -19,6 +22,11 @@ public static class EntryPoint
             ?? throw new InvalidOperationException(
                 "Connection string 'InvoicePortal' is missing. Set the ConnectionStrings__InvoicePortal environment variable (see docker-compose.yml).");
 
+        // OpenTelemetry traces, metrics and logs. Exporters are chosen by configuration: OTLP (Telemetry:OtlpEndpoint or
+        // OTEL_EXPORTER_OTLP_ENDPOINT) and/or Azure Monitor (APPLICATIONINSIGHTS_CONNECTION_STRING, set by the Bicep template).
+        // With neither set, nothing is exported. See Telemetry/TelemetryExtensions.cs.
+        builder.AddInvoicePortalTelemetry();
+
         builder.Services.AddRazorComponents()
             .AddInteractiveServerComponents();
 
@@ -34,6 +42,18 @@ public static class EntryPoint
         // AI features (NL query, document Q&A). Provider "Mock" needs no keys or network; see Ai/AiServiceCollectionExtensions.cs.
         builder.AddInvoicePortalAi();
 
+        builder.Services.AddHealthChecks();
+
+        // In Azure (infra/resources.bicep sets DataProtection__BlobUri) the Data Protection key ring lives in Blob
+        // Storage so antiforgery tokens and circuits survive container restarts. Locally the default file store is used.
+        var dataProtectionBlobUri = builder.Configuration["DataProtection:BlobUri"];
+        if (!string.IsNullOrWhiteSpace(dataProtectionBlobUri))
+        {
+            builder.Services.AddDataProtection()
+                .SetApplicationName("InvoicePortal.Admin")
+                .PersistKeysToAzureBlobStorage(new Uri(dataProtectionBlobUri), new DefaultAzureCredential());
+        }
+
         var app = builder.Build();
 
         if (!app.Environment.IsDevelopment())
@@ -45,6 +65,7 @@ public static class EntryPoint
         // HTTP only inside the container; no HTTPS redirection.
         app.UseAntiforgery();
 
+        app.MapHealthChecks("/healthz");
         app.MapStaticAssets();
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();

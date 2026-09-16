@@ -1,4 +1,5 @@
 using System.Text.Json;
+using InvoicePortal.Admin.Telemetry;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Options;
 
@@ -53,12 +54,28 @@ public sealed class QueryGenerationService(
 
         rateLimiter.Acquire();
 
-        var response = await chat.GetResponseAsync(
-            [new ChatMessage(ChatRole.System, BuildSystemPrompt()), new ChatMessage(ChatRole.User, trimmed)],
-            new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json },
-            cancellationToken);
+        using var activity = InvoicePortalTelemetry.Source.StartActivity("ai.query.generate");
+        activity?.SetTag("ai.prompt.length", trimmed.Length);
+        try
+        {
+            var response = await chat.GetResponseAsync(
+                [new ChatMessage(ChatRole.System, BuildSystemPrompt()), new ChatMessage(ChatRole.User, trimmed)],
+                new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json },
+                cancellationToken);
 
-        return Parse(response.Text);
+            var query = Parse(response.Text);
+            activity?.SetTag("ai.query.parameter_count", query.ParamValues.Count);
+            activity?.SetTag("ai.query.model_error", query.Error is not null);
+            InvoicePortalTelemetry.RecordAiRequest(InvoicePortalTelemetry.Feature.Query,
+                query.Error is null ? InvoicePortalTelemetry.Outcome.Ok : InvoicePortalTelemetry.Outcome.Rejected);
+            return query;
+        }
+        catch (Exception ex)
+        {
+            activity.RecordException(ex);
+            InvoicePortalTelemetry.RecordAiRequest(InvoicePortalTelemetry.Feature.Query, InvoicePortalTelemetry.Outcome.Error);
+            throw;
+        }
     }
 
     /// <summary>Validates the JSON contract; exposed for tests.</summary>
