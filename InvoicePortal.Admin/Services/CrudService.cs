@@ -51,6 +51,12 @@ public sealed class CrudService<TEntity>(IDbContextFactory<InvoicePortalDbContex
         {
             query = DefaultOrder(query);
         }
+        else if (args.Skip is > 0 || args.Top is > 0)
+        {
+            var primaryKey = db.Model.FindEntityType(typeof(TEntity))?.FindPrimaryKey()?.Properties.SingleOrDefault()
+                ?? throw new InvalidOperationException($"{typeof(TEntity).Name} must have a single-column primary key for paging.");
+            query = query.OrderBy(primaryKey.Name);
+        }
 
         if (args.Skip is > 0)
         {

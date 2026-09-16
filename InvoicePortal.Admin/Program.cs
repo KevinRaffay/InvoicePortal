@@ -1,12 +1,14 @@
 using InvoicePortal.Admin.Ai;
 using InvoicePortal.Admin.Components;
 using InvoicePortal.Admin.Data;
+using InvoicePortal.Admin.Logging;
 using InvoicePortal.Admin.Services;
 using InvoicePortal.Admin.Telemetry;
 using Azure.Identity;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.EntityFrameworkCore;
 using Radzen;
+using Serilog;
 
 namespace InvoicePortal.Admin;
 
@@ -14,17 +16,36 @@ namespace InvoicePortal.Admin;
 // global "Program" class does not shadow the scaffolded Data.Entities.Program entity.
 public static class EntryPoint
 {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
+    {
+        // Console-only until configuration is available; never guess an Azure destination at bootstrap.
+        Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateBootstrapLogger();
+        try
+        {
+            await RunApplicationAsync(args);
+        }
+        catch (Exception exception)
+        {
+            Log.Fatal(exception, "Admin terminated unexpectedly");
+            throw;
+        }
+        finally
+        {
+            await Log.CloseAndFlushAsync();
+        }
+    }
+
+    private static async Task RunApplicationAsync(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.AddInvoicePortalLogging();
 
         var connectionString = builder.Configuration.GetConnectionString("InvoicePortal")
             ?? throw new InvalidOperationException(
                 "Connection string 'InvoicePortal' is missing. Set the ConnectionStrings__InvoicePortal environment variable (see docker-compose.yml).");
 
-        // OpenTelemetry traces, metrics and logs. Exporters are chosen by configuration: OTLP (Telemetry:OtlpEndpoint or
-        // OTEL_EXPORTER_OTLP_ENDPOINT) and/or Azure Monitor (APPLICATIONINSIGHTS_CONNECTION_STRING, set by the Bicep template).
-        // With neither set, nothing is exported. See Telemetry/TelemetryExtensions.cs.
+        // OpenTelemetry owns traces/metrics and optional OTLP logs (e.g. Aspire).
+        // Serilog owns files, console, Application Insights logs and Datadog logs; no duplicate Azure Monitor log exporter.
         builder.AddInvoicePortalTelemetry();
 
         builder.Services.AddRazorComponents()
@@ -55,6 +76,12 @@ public static class EntryPoint
         }
 
         var app = builder.Build();
+        var logging = app.Services.GetRequiredService<AppLoggingOptions>();
+        foreach (var warning in logging.GetWarnings(app.Configuration))
+            app.Logger.LogWarning("{LoggingConfigurationWarning}", warning);
+        app.Logger.LogInformation("Logging configured: Azure={RunningInAzure}, File={FileEnabled}, ApplicationInsights={ApplicationInsightsEnabled}, Datadog={DatadogEnabled}",
+            logging.IsAzure(app.Configuration), !logging.IsAzure(app.Configuration),
+            logging.UseApplicationInsights(app.Configuration), logging.UseDatadog(app.Configuration));
 
         if (!app.Environment.IsDevelopment())
         {
@@ -70,6 +97,6 @@ public static class EntryPoint
         app.MapRazorComponents<App>()
             .AddInteractiveServerRenderMode();
 
-        app.Run();
+        await app.RunAsync();
     }
 }

@@ -180,17 +180,91 @@ Tests (no database needed):
 dotnet test InvoicePortal.slnx
 ```
 
+## Logging (Serilog)
+
+All Admin `ILogger<T>` messages and direct Serilog events now use one Serilog pipeline. No changes are
+needed in consuming services. The bootstrap logger writes to console; the fully configured logger takes
+over at host construction, and shutdown flushes sinks. Forced process termination can lose buffered logs.
+
+| Hosting | Log destinations |
+|---------|------------------|
+| Local .NET process or local Docker (including `Production`) | Console + rolling newline-delimited JSON files, optional OTLP logs for Aspire |
+| Azure Container Apps / App Service | Console + Application Insights + Datadog, with each cloud sink enabled only when its credential is supplied; no rolling files |
+
+Azure detection uses `CONTAINER_APP_NAME`, `WEBSITE_INSTANCE_ID`, or `WEBSITE_SITE_NAME`, **not** the
+`Production` environment or the presence of cloud credentials. Override with `AppLogging__RunningInAzure`
+(`true`/`false`) for other hosting such as Azure VMs/AKS. Leave it unset for automatic detection.
+
+Local defaults: `logs/invoiceportal-YYYYMMDD.json` relative to the app's content root, daily rolling and
+additional rolls at 10 MiB, retaining 14 **files**, not necessarily 14 days. A single oversized event may
+exceed the size threshold. Configure `AppLogging__FilePath`, `AppLogging__FileSizeLimitBytes`, and
+`AppLogging__RetainedFileCountLimit`. The default log directory is excluded from git, Docker build context,
+and publish output. Use a persistent writable volume for local Docker if logs must survive container
+replacement (default path `/app/logs`); custom paths require equivalent exclusions/permissions.
+
+### Azure logging configuration
+
+| Setting | Purpose |
+|---------|---------|
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Already supplied by the Bicep template. `Telemetry__AzureMonitorConnectionString` takes precedence if set. |
+| `DD_API_KEY` | Datadog API key, supplied as an Azure container/app secret reference or Key Vault reference. Never commit it. `AppLogging__DatadogApiKey` is an alternative. |
+| `DD_SITE` | Datadog region, default `datadoghq.com`. Supported: `datadoghq.eu`, `us3.datadoghq.com`, `us5.datadoghq.com`, `ap1.datadoghq.com`, `ap2.datadoghq.com`, `ddog-gov.com`. `AppLogging__DatadogSite` takes precedence. Logs use HTTPS port 443. |
+| `DD_SERVICE`, `DD_ENV`, `DD_VERSION` | Optional Datadog service/environment/version overrides; defaults match the app's service name, ASP.NET environment and assembly version. |
+| `AppLogging__ApplicationInsightsEnabled`, `AppLogging__DatadogEnabled` | Independently disable a cloud sink; both default to `true`. Only effective in Azure. |
+| `AppLogging__ConsoleEnabled` | Defaults to `true`. Disable when Azure console collection would be redundant with direct sinks. Bootstrap failures still reach console. |
+
+The current infrastructure **does not provision Datadog or bind its API key**. Configure that secret reference
+and site in your deployment configuration before expecting Datadog delivery, and ensure later IaC deployments
+preserve them. No Azure deployment is performed by this logging change. Missing credentials produce a startup
+warning instead of preventing the app from starting. Datadog failures emit a generic stderr diagnostic without
+echoing credentials. Remote delivery is best-effort, asynchronously buffered (Datadog queue: 10,000 events),
+not a durable audit log. Network failures/queue exhaustion or forced shutdown can lose logs.
+
+### Telemetry conflicts, redundancy and privacy
+
+- **Application Insights duplicate logs prevented:** Serilog is the only Application Insights log sender.
+  The previous `AddAzureMonitorLogExporter` is removed. OpenTelemetry still exports traces and metrics.
+  Do not add `AddApplicationInsightsTelemetry`, another Application Insights logger provider, or a second
+  request/dependency auto-instrumentation agent alongside the current OpenTelemetry instrumentation.
+- **Aspire preserved:** Serilog forwards once to the OpenTelemetry log provider via `writeToProviders`.
+  Default Console/Debug/EventSource logging providers are removed so console output is not duplicated.
+- **Collector duplication:** if your OTLP collector also forwards logs to Application Insights/Datadog,
+  set `Telemetry__OtlpLogsEnabled=false` (or disable the corresponding direct Serilog sink). Traces/metrics
+  continue. Azure startup emits a warning when OTLP logs are also configured.
+- **Console/agent duplication:** Azure Container Apps already collects stdout into Log Analytics. An agent
+  collecting stdout and forwarding it to Datadog can duplicate direct sink delivery. Choose one route;
+  otherwise expect additional storage/ingestion cost. Azure startup warns when console logging is enabled.
+- **Signals are not interchangeable:** a dependency span and an application log can describe the same
+  operation. Exceptions may appear as both an OpenTelemetry span event and an Application Insights exception.
+  Trace sampling does not sample Serilog logs. No Serilog request-logging middleware or Datadog APM profiler
+  is added, avoiding another request-span pipeline. Datadog receives logs only; APM correlation requires
+  separately configured compatible trace ingestion/remapping. Application Insights logs use captured
+  Activity trace/span IDs and matching cloud role names for correlation.
+- **SQL/privacy:** `Telemetry__RecordSqlText=false` protects spans, not log messages. EF
+  `Microsoft.EntityFrameworkCore.Database.Command` logs are suppressed below `Fatal` by default (including
+  failed-command SQL text). Other errors still surface through EF/query/circuit loggers. Do not enable
+  sensitive-data logging or log invoice content, credentials, prompts, or completions. Arbitrary message
+  text/exception details are **not automatically redacted**. Restrict file permissions and remote retention.
+- **Configuration:** use `Serilog:MinimumLevel:Default` and `Serilog:MinimumLevel:Override` for levels;
+  the former `Logging:LogLevel` settings no longer control the Serilog pipeline. Destinations under
+  `Serilog:WriteTo` or `Serilog:AuditTo` are rejected at startup: code selects sinks by hosting to prevent
+  duplicates and accidental local-to-cloud export.
+- `Telemetry__Enabled=false` disables OpenTelemetry only. Serilog still writes local files or configured
+  Azure sinks; cloud log settings are independent of trace/metric switches.
+
 ## Telemetry (OpenTelemetry)
 
 The app emits OpenTelemetry traces (requests, SQL commands, outgoing HTTP, one span per chat-model call with
 token usage, and its own `ai.query.generate` / `ai.query.execute` / `ai.documents.answer` spans), metrics
-(ASP.NET Core, runtime, EF Core, chat tokens, `invoiceportal.ai.requests`) and logs with trace ids. **By default
-nothing is exported.** Exporters switch on by configuration:
+(ASP.NET Core, runtime, EF Core, chat tokens, `invoiceportal.ai.requests`) and optional Serilog-forwarded OTLP
+logs with trace ids. **Local defaults do not export remotely** (console and files are still written).
+Exporters switch on by configuration:
 
 | Setting                                 | Effect                                                                  |
 |-----------------------------------------|-------------------------------------------------------------------------|
-| `OTEL_EXPORTER_OTLP_ENDPOINT` (or `Telemetry__OtlpEndpoint`) | Send everything over OTLP (gRPC; set `Telemetry__OtlpProtocol=http/protobuf` for HTTP) |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` (or `Telemetry__AzureMonitorConnectionString`) | Send everything to Application Insights. The Azure template sets this. |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` (or `Telemetry__OtlpEndpoint`) | Send traces, metrics and optionally logs over OTLP (gRPC; set `Telemetry__OtlpProtocol=http/protobuf` for HTTP) |
+| `Telemetry__OtlpLogsEnabled` | `true`: enable the OTLP log route; `false` disables just OTLP logs, not traces/metrics |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` (or `Telemetry__AzureMonitorConnectionString`) | OpenTelemetry traces/metrics to Application Insights; Serilog logs to it only in Azure. The Azure template sets this. |
 | `Telemetry__RecordSqlText`              | `false`: SQL statement text is **not** recorded on spans (the data is a production copy) |
 | `Telemetry__RecordAiContent`            | `false`: prompts and completions are **not** recorded on chat spans      |
 | `Telemetry__TraceSamplingRatio`         | `1.0`: head sampling for traces                                          |

@@ -15,6 +15,9 @@ public sealed class TelemetryOptions
     /// <summary>Master switch. When false no OpenTelemetry provider is registered at all.</summary>
     public bool Enabled { get; set; } = true;
 
+    /// <summary>Forward Serilog logs through OTLP. Turn off when a collector would duplicate direct cloud sinks.</summary>
+    public bool OtlpLogsEnabled { get; set; } = true;
+
     /// <summary><c>service.name</c> on every exported resource.</summary>
     [Required]
     public string ServiceName { get; set; } = "InvoicePortal.Admin";

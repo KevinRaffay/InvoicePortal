@@ -67,10 +67,11 @@ InvoicePortal.slnx
 │   ├── Program.cs                 composition root (EntryPoint.Main)
 │   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
 │   ├── Services/                  CrudService<T>, LookupService, EnumDisplay
+│   ├── Logging/                   Serilog routing, validated settings, Application Insights correlation
 │   ├── Data/                      EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL->SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
-├── InvoicePortal.Admin.Tests/     xUnit tests for the AI slice, no database required
+├── InvoicePortal.Admin.Tests/     xUnit tests for AI, telemetry and logging, no database required
 ├── docs/                          this document's rendered copy + build script, Azure deployment guide
 ├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
 ├── azure.yaml                     Azure Developer CLI (azd) service definition
@@ -90,7 +91,11 @@ Key packages:
 | `Azure.Extensions.AspNetCore.DataProtection.Blobs` | 1.5.4 | Data Protection key ring in Blob Storage when hosted in Azure |
 | `OpenTelemetry.Extensions.Hosting` + `Instrumentation.AspNetCore`, `.Http`, `.SqlClient`, `.Runtime` | 1.18.0 | Traces, metrics and logs (section 3.4) |
 | `OpenTelemetry.Exporter.OpenTelemetryProtocol` | 1.18.0 | OTLP export to the Aspire Dashboard or any collector |
-| `Azure.Monitor.OpenTelemetry.Exporter` | 1.9.0  | Export to Application Insights when hosted in Azure  |
+| `Azure.Monitor.OpenTelemetry.Exporter` | 1.9.0  | Application Insights traces and metrics (not logs) |
+| `Serilog.AspNetCore` | 10.0.0 | Unified ILogger pipeline, console, bootstrap and shutdown |
+| `Serilog.Sinks.File` | 7.0.0 | Local daily/size-rolled JSON logs with retention |
+| `Serilog.Sinks.ApplicationInsights` | 5.0.1 | Azure application logs, correlated with OpenTelemetry activities |
+| `Serilog.Sinks.Datadog.Logs` | 0.6.1 | Azure logs to Datadog over HTTPS, bounded asynchronous queue |
 | `Microsoft.SqlServer.DacFx`          | 170.5.76 | Bacpac import (DbInit only)                          |
 
 ---
@@ -148,6 +153,7 @@ Blazor Server keeps one DI scope per SignalR circuit, so "scoped" here means "pe
 | `LookupService`                                | Scoped    | Dropdown sources cached per circuit for 30 seconds.                                   |
 | `IChatClient`                                  | Singleton | Provider-dependent pipeline chosen by `Ai:Provider` (see 7.2). Always ends in `.UseOpenTelemetry()` then `.UseLogging()`. |
 | OpenTelemetry providers                        | Singleton | `AddOpenTelemetry()` with tracing, metrics and logging (see 3.4). Skipped entirely when `Telemetry:Enabled` is false. |
+| Serilog logger, `AppLoggingOptions` | Singleton | Logging is configured before telemetry. Clears default logging providers and forwards once to the optional OTLP provider. Independent of `Telemetry:Enabled`. |
 | `IDocumentRetriever`                           | Singleton | `InMemoryDocumentRetriever` for every provider. Index built lazily on first use.     |
 | Health checks                                  | n/a       | `AddHealthChecks()` mapped at `/healthz` for container probes.                        |
 | Data Protection                                | Singleton | Only when `DataProtection:BlobUri` is set: key ring persisted to Blob Storage with `DefaultAzureCredential`, so antiforgery tokens survive container restarts. Locally the default file store is used. |
@@ -166,10 +172,13 @@ Every grid page inherits `CrudPageBase<TEntity, TDialog>` and every edit dialog 
 `Shape` for `Include`s, `DialogWidth`). The bases provide server-side `LoadData`, Add/Edit through a
 dialog, Delete with confirmation, Restore, the "Show deleted" toggle, and notifications.
 
-### 3.4 Observability (OpenTelemetry)
+### 3.4 Observability (Serilog and OpenTelemetry)
 
-`Telemetry/TelemetryExtensions.cs` registers one OpenTelemetry pipeline for traces, metrics and logs. It is
-always on in-process; what leaves the process is decided by configuration.
+`Logging/LoggingExtensions.cs` makes Serilog the sole application logging pipeline. Local hosts (including
+Docker Production) write console and daily/size-rolled JSON files. Azure hosts write console plus Application
+Insights and Datadog when their credentials are supplied, without local files. `EntryPoint.Main` uses a
+console bootstrap logger and flushes on exit. `Telemetry/TelemetryExtensions.cs` keeps OpenTelemetry traces
+and metrics, plus optional OTLP logs forwarded by Serilog for Aspire. OpenTelemetry can be disabled independently.
 
 ```mermaid
 flowchart LR
@@ -180,39 +189,64 @@ flowchart LR
         Chat["IChatClient.UseOpenTelemetry<br/>(one chat span per model call, token usage)"]
         Own["ActivitySource InvoicePortal.Admin<br/>ai.query.generate, ai.query.execute, ai.documents.answer"]
         Logs["ILogger (with trace/span ids)"]
+        Serilog["Serilog<br/>scopes, service, version, environment"]
         Runtime[".NET runtime + EF Core meters"]
         SDK["OpenTelemetry SDK<br/>resource: service.name, version, instance, environment"]
     end
     Otlp["OTLP endpoint<br/>Aspire Dashboard (compose profile otel),<br/>or any collector"]
     AppInsights["Application Insights<br/>(APPLICATIONINSIGHTS_CONNECTION_STRING)"]
+    Datadog["Datadog logs<br/>(DD_API_KEY, DD_SITE)"]
+    Files["Local rolling JSON files<br/>daily + 10 MiB, retain 14 files"]
+    Console["Console<br/>optional Azure stdout collection"]
 
     Req --> SDK
     Http --> SDK
     Sql --> SDK
     Chat --> SDK
     Own --> SDK
-    Logs --> SDK
+    Logs --> Serilog
+    Serilog -.->|"optional OTLP logs only"| SDK
+    Serilog --> Console
+    Serilog -.->|"not Azure"| Files
+    Serilog -.->|"Azure logs, credential required"| AppInsights
+    Serilog -.->|"Azure logs, credential required"| Datadog
     Runtime --> SDK
     SDK -.->|"Telemetry:OtlpEndpoint or OTEL_EXPORTER_OTLP_ENDPOINT"| Otlp
-    SDK -.->|"Telemetry:AzureMonitorConnectionString or the env var"| AppInsights
+    SDK -.->|"traces and metrics only, connection string required"| AppInsights
 ```
 
 | Signal  | Sources                                                                                                          |
 |---------|------------------------------------------------------------------------------------------------------------------|
 | Traces  | ASP.NET Core (filtered by `TelemetryExtensions.IsNoiseRequest`), HttpClient, SqlClient, `InvoicePortal.Admin.Ai` (the `Microsoft.Extensions.AI` decorator, GenAI semantic conventions), `InvoicePortal.Admin` (own spans), plus the spans .NET 10 Blazor emits itself (`Event onclick -> ...`, `Route ...`, `Circuit ...`). Head sampling `Telemetry:TraceSamplingRatio`, parent-based. `NoiseFilteringProcessor` un-records the per-hub-call plumbing spans (`ComponentHub/OnRenderCompleted`, `EndInvokeJSFromDotNet`, ...) that would otherwise produce dozens of one-span traces per click; it is a processor, not a sampler, because SignalR names the span only after it starts. |
 | Metrics | ASP.NET Core and Kestrel, HttpClient, .NET runtime, `Microsoft.EntityFrameworkCore`, chat token usage and duration, `invoiceportal.ai.requests` (by `ai.feature` and `ai.outcome`), `invoiceportal.ai.query.rows`. |
-| Logs    | Every `ILogger` message, with formatted text, scopes and the current trace and span ids. Console logging stays on. |
+| Logs    | `ILogger` and direct Serilog messages, filtered by Serilog levels, with scopes and captured Activity IDs. Console stays on by default. Application Insights uses the captured trace/span IDs and matching role name for correlation. |
 
-Exporters: OTLP (gRPC by default, `http/protobuf` optional) and Azure Monitor, each added only when its
-endpoint or connection string is present, so both can run together and neither runs by default. The Bicep
-template sets `APPLICATIONINSIGHTS_CONNECTION_STRING` on the container, so the Azure deployment reports to
-Application Insights with no further configuration. Locally, `docker compose --profile otel up -d` starts the
-standalone Aspire Dashboard as an in-memory OTLP sink on <http://localhost:18888>.
+OpenTelemetry exporters: OTLP (gRPC by default, `http/protobuf` optional) and Azure Monitor traces/metrics,
+each added only when its endpoint/connection string is present. Serilog is the only Application Insights
+log exporter: the former Azure Monitor log exporter is removed. `Telemetry:OtlpLogsEnabled=false` disables
+just OTLP logs when a collector would duplicate direct sinks. `writeToProviders` preserves Aspire logging
+without another console provider. The existing Bicep supplies the Application Insights connection string;
+Datadog secret/site configuration is an operator prerequisite, not provisioned by the current template.
+The standalone Aspire Dashboard is an in-memory OTLP sink on <http://localhost:18888>. The local `http-otel`
+launch profile sends to port 18889; no database initialization is needed for logging changes.
+
+> **Redundancy warning.** Azure stdout collection may store the same logs again in Log Analytics or forward
+> them to Datadog. Choose one collection path or disable `AppLogging:ConsoleEnabled`. Do not add another
+> Application Insights logging provider or auto-instrumentation agent. Exceptions can legitimately exist
+> as both span events and exception logs. Trace sampling does not sample Serilog logs. Datadog receives
+> logs only, not APM traces; linking to APM needs compatible trace ingestion and field mapping. Startup
+> warns about missing credentials, Azure console collection and simultaneous OTLP log export.
 
 Two privacy switches default to off because the database is a copy of production: `Telemetry:RecordSqlText`
 (statement text on database spans) and `Telemetry:RecordAiContent` (prompts and completions on chat spans).
 Span attributes otherwise carry only counts and lengths: prompt length, parameter count, row count, truncation,
 source and citation counts.
+
+These switches do not redact log messages. EF Database.Command logs (including failed-command SQL) default
+to a Serilog `Fatal` threshold so statement text is not copied into files or cloud logs. Other EF/circuit
+errors remain visible. General exception messages and explicit application properties can still contain
+sensitive data; do not log credentials, invoice content or prompts. No additional Serilog request-logging
+middleware is installed because the existing request traces already record timings.
 
 The instrumentation calls in the AI services are `ActivitySource.StartActivity` and counter increments; when no
 listener is attached they return null and do nothing, which is also why the unit tests need no telemetry setup.
@@ -578,6 +612,26 @@ before enabling it outside the local machine.
 | SQL SA password, DB name            | `.env` (`MSSQL_SA_PASSWORD`, `DB_NAME`), read by compose | same password hard-coded in `appsettings.Development.json` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `Telemetry__RecordSqlText` | from `.env` (`OTEL_EXPORTER_OTLP_ENDPOINT`, `TELEMETRY_RECORD_SQL_TEXT`), empty / false by default | `Telemetry` section in `appsettings.json`, or `OTEL_EXPORTER_OTLP_ENDPOINT` set in the shell (`http://localhost:18889` for the dashboard) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | not set                                       | not set; set by the Bicep template in Azure     |
+| `AppLogging__RunningInAzure` | unset, auto-detects as local despite Production | unset, auto-detects as local; override for other Azure hosts |
+| `AppLogging__FilePath` | `/app/logs/invoiceportal-.json` by default, mount a writable volume for persistence | `logs/invoiceportal-.json` under content root |
+| `AppLogging__FileSizeLimitBytes`, `AppLogging__RetainedFileCountLimit` | 10485760 bytes, 14 files, daily and size rolling | same defaults; not necessarily 14 days |
+| `DD_API_KEY`, `DD_SITE` | ignored for local logging | used only in Azure; site defaults to `datadoghq.com`, key must be a secret reference |
+| `Telemetry__OtlpLogsEnabled` | true when OTLP configured | true, keeps Aspire structured logs |
+
+Azure detection checks `CONTAINER_APP_NAME`, `WEBSITE_INSTANCE_ID`, or `WEBSITE_SITE_NAME`; neither
+`Production` nor cloud credentials imply Azure. For Azure VM/AKS hosting use the explicit override.
+`AppLogging__ApplicationInsightsEnabled` and `AppLogging__DatadogEnabled` can disable cloud sinks separately.
+`AppLogging__DatadogApiKey` and `AppLogging__DatadogSite` override the standard Datadog keys.
+Datadog's supported sites and secure configuration steps are in the README logging section. Use secret/Key
+Vault references, never source-controlled keys. Missing credentials disable just that sink with a startup warning.
+Optional `DD_SERVICE`, `DD_ENV`, `DD_VERSION` override Datadog tags. Configure levels under `Serilog:MinimumLevel`,
+not the former `Logging:LogLevel`. `Serilog:WriteTo`/`Serilog:AuditTo` are rejected at startup so configuration
+cannot bypass the environment-based sink selection.
+
+Local log folders are git/Docker/publish-excluded. Custom paths need equivalent exclusions and permissions.
+Datadog is batched with a 10,000-event queue; remote delivery is best-effort, not a durable audit trail.
+Sink shutdown flushes normally, but force-kills, network failures, queue limits, or container replacement
+can lose logs. Local files roll after the threshold is reached, so a single oversized event can exceed it.
 
 **Azure hosting.** `azure.yaml` and `infra/*.bicep` describe an Azure Developer CLI deployment to Container
 Apps (one replica, sticky sessions and WebSockets for the Blazor circuit). The template provisions a container
@@ -619,16 +673,17 @@ returns 404 for `blazor.web.js` and no circuit starts.
   mitigation, not a guarantee.
 - **Data**: the bacpac is a copy of production data, including user emails. It lives only in the Docker
   volume and the bind-mounted file, both excluded from git.
-- **Telemetry**: nothing is exported unless an OTLP endpoint or an Application Insights connection string
-  is configured. SQL statement text and prompt/completion content are excluded from spans unless
-  `Telemetry:RecordSqlText` / `Telemetry:RecordAiContent` are switched on; the App Insights path in Azure
-  therefore receives request, dependency and model-call timings and token counts, not data.
+- **Telemetry/logging**: local defaults write console and rolling files but do not export remotely. OTLP,
+  Application Insights and Azure Datadog require configured destinations/credentials. SQL/prompt content is
+  excluded from spans unless the telemetry privacy switches are enabled. Log messages and exceptions are
+  not automatically redacted; EF SQL-command logs are separately suppressed by default. Restrict file access
+  and cloud retention, avoid sensitive properties, and account for third-party Datadog egress.
 
 ---
 
 ## 10. Testing
 
-`InvoicePortal.Admin.Tests` (xUnit) covers the AI slice without a database:
+`InvoicePortal.Admin.Tests` (xUnit) covers AI, telemetry and logging without a database:
 
 | Test class                          | Covers                                                             |
 |-------------------------------------|--------------------------------------------------------------------|
@@ -639,6 +694,7 @@ returns 404 for `blazor.web.js` and no circuit starts.
 | `CitationSelectorTests`             | Cited-only selection, ordering, rejection of missing or unknown labels. |
 | `AiOptionsTests`                    | Only `Mock`, `Ollama` and `AzureOpenAI` pass validation; Ollama defaults point at a local coder model with a large enough context. |
 | `TelemetryOptionsTests`             | Defaults export nothing and record no SQL text or prompt content; OTLP protocol and sampling ratio validation; health probe and static assets are excluded from request tracing. |
+| `AppLoggingTests` | Azure detection/override, credential-gated sink selection, trusted Datadog sites, startup warnings, Activity-to-Application Insights correlation, real local file rolling/retention, and once-only OTLP log forwarding with scopes and trace ID. No cloud calls. |
 
 Run with:
 
@@ -646,7 +702,9 @@ Run with:
 dotnet test InvoicePortal.slnx
 ```
 
-CRUD pages and services are exercised manually against the container; there are no integration tests.
+CRUD pages and services are exercised manually against the container. Logging tests construct an in-process
+host with temporary files and an in-memory OpenTelemetry exporter; cloud delivery requires configured
+credentials and an environment smoke test, and is not claimed by offline tests.
 
 ---
 
