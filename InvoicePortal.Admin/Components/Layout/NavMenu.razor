@@ -1,0 +1,17 @@
+@inject IOptions<AiOptions> Ai
+
+<RadzenPanelMenu>
+    <RadzenPanelMenuItem Text="Home" Icon="home" Path="/" />
+    <RadzenPanelMenuItem Text="Invoices" Icon="receipt" Path="/invoices" />
+    @if (Ai.Value.Enabled)
+    {
+        <RadzenPanelMenuItem Text="AI Insights" Icon="auto_awesome" Path="/ai/query" />
+    }
+    <RadzenPanelMenuItem Text="Lookups" Icon="table_view" Expanded="true">
+        <RadzenPanelMenuItem Text="Bottlers" Icon="factory" Path="/bottlers" />
+        <RadzenPanelMenuItem Text="Payers" Icon="account_balance" Path="/payers" />
+        <RadzenPanelMenuItem Text="Sales Centers" Icon="storefront" Path="/sales-centers" />
+        <RadzenPanelMenuItem Text="Programs" Icon="campaign" Path="/programs" />
+        <RadzenPanelMenuItem Text="Currencies" Icon="payments" Path="/currencies" />
+    </RadzenPanelMenuItem>
+</RadzenPanelMenu>

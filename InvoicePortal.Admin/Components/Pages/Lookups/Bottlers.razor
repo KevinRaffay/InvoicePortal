@@ -1,0 +1,57 @@
+@page "/bottlers"
+@using InvoicePortal.Admin.Components.Pages.Ai
+@inherits CrudPageBase<Bottler, BottlerDialog>
+@inject IOptions<AiOptions> Ai
+
+<PageTitle>Bottlers</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Bottlers</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@Reload" title="Refresh" />
+        <RadzenButton Icon="add" Text="New bottler" Click="@Add" />
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenDataGrid @ref="Grid" TItem="Bottler" Data="@Items" Count="@Count" LoadData="@LoadData" IsLoading="@IsLoading"
+                AllowFiltering="true" FilterMode="FilterMode.SimpleWithMenu" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="true" AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                AllowColumnResize="true" Density="Density.Compact" EmptyText="No bottlers.">
+    <Columns>
+        <RadzenDataGridColumn TItem="Bottler" Property="Id" Title="Id" Width="100px" />
+        <RadzenDataGridColumn TItem="Bottler" Property="Name" Title="Name" />
+        <RadzenDataGridColumn TItem="Bottler" Property="SalesOrganization" Title="Sales Org" Width="110px" />
+        <RadzenDataGridColumn TItem="Bottler" Property="Currency.Code" Title="Currency" Width="110px" />
+        <RadzenDataGridColumn TItem="Bottler" Property="Country.Name" Title="Country" Width="150px" />
+        <RadzenDataGridColumn TItem="Bottler" Property="BrandSegmentCategory.Name" Title="Brand Segment" Width="180px" />
+        <RadzenDataGridColumn TItem="Bottler" Property="UpdatedAt" Title="Updated (UTC)" FormatString="{0:yyyy-MM-dd HH:mm}" Width="160px" />
+        <RadzenDataGridColumn TItem="Bottler" Filterable="false" Sortable="false" Width="@(AskAiEnabled ? "150px" : "110px")" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                @if (AskAiEnabled)
+                {
+                    <RadzenButton Icon="forum" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Info" Variant="Variant.Text" Click="@(() => AskAi(row))" title="Ask the documents about this bottler" />
+                }
+                <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Edit(row))" title="Edit" />
+                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(() => Delete(row))" title="Delete" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    protected override string EntityName => "Bottler";
+    protected override object KeyOf(Bottler e) => e.Id;
+    protected override string Describe(Bottler e) => $"bottler {e.Id} ({e.Name})";
+    protected override IQueryable<Bottler> Shape(IQueryable<Bottler> q)
+        => q.Include(b => b.Currency).Include(b => b.Country).Include(b => b.BrandSegmentCategory);
+
+    private bool AskAiEnabled => Ai.Value.Enabled && Ai.Value.DocumentChatEnabled;
+
+    // The "customer" of the customer-insights demo is a Bottler here: open the document chat pre-filled with its name.
+    private async Task AskAi(Bottler row)
+    {
+        await DialogService.OpenAsync<AskDocumentsDialog>("Ask the documents",
+            new Dictionary<string, object?> { ["Question"] = $"What do the documents say about {row.Name}?" },
+            new DialogOptions { Width = "720px", Resizable = true, Draggable = true });
+    }
+}

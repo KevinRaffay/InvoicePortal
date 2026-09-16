@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="InvoicePortal.Admin.Tests/InvoicePortal.Admin.Tests.csproj" />
+  <Project Path="InvoicePortal.Admin/InvoicePortal.Admin.csproj" />
+  <Project Path="InvoicePortal.DbInit/InvoicePortal.DbInit.csproj" />
+</Solution>

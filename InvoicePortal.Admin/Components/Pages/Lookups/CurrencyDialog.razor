@@ -1,0 +1,33 @@
+@inherits EditDialogBase<Currency>
+
+<RadzenTemplateForm TItem="Currency" Data="@Model" Submit="@(async (Currency _) => await Submit())">
+    <RadzenStack Gap="1rem">
+        @if (Error is not null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@Error</RadzenAlert>
+        }
+        @if (!IsNew)
+        {
+            <RadzenFormField Text="Id" Variant="Variant.Outlined">
+                <RadzenTextBox Value="@Model.Id.ToString()" Disabled="true" />
+            </RadzenFormField>
+        }
+        <RadzenFormField Text="Code (ISO, 3 chars)" Variant="Variant.Outlined">
+            <ChildContent>
+                <RadzenTextBox Name="Code" @bind-Value="Model.Code" MaxLength="3" />
+            </ChildContent>
+            <Helper>
+                <RadzenRequiredValidator Component="Code" Text="Code is required" />
+                <RadzenLengthValidator Component="Code" Min="3" Max="3" Text="Code must be exactly 3 characters" />
+            </Helper>
+        </RadzenFormField>
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@Cancel" />
+            <RadzenButton ButtonType="ButtonType.Submit" Text="@(IsNew ? "Create" : "Save")" Icon="save" IsBusy="@IsBusy" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    protected override Currency CreateNew() => new() { Code = string.Empty };
+}

@@ -1,0 +1,119 @@
+@page "/invoices"
+@inherits CrudPageBase<Invoice, InvoiceDialog>
+
+<PageTitle>Invoices</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Invoices</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
+        <RadzenSwitch Value="@ShowDeleted" Change="@(async (bool v) => await ToggleShowDeleted(v))" Name="ShowDeleted" />
+        <RadzenLabel Text="Show deleted" Component="ShowDeleted" />
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@Reload" title="Refresh" />
+        <RadzenButton Icon="add" Text="New invoice" Click="@Add" />
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenDataGrid @ref="Grid" TItem="Invoice" Data="@Items" Count="@Count" LoadData="@LoadData" IsLoading="@IsLoading"
+                AllowFiltering="true" FilterMode="FilterMode.SimpleWithMenu" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="true" AllowPaging="true" PageSize="20" PageSizeOptions="@pageSizes" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                AllowColumnResize="true" AllowColumnPicking="true" Density="Density.Compact" EmptyText="No invoices."
+                RowRender="@RowRender">
+    <Columns>
+        <RadzenDataGridColumn TItem="Invoice" Property="Id" Title="Id" Width="90px" Frozen="true" />
+        <RadzenDataGridColumn TItem="Invoice" Property="Number" Title="Invoice #" Width="150px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="InvoiceType" Title="Type" Width="120px">
+            <FilterTemplate>
+                <RadzenDropDown @bind-Value="typeFilter" Data="@LookupService.InvoiceTypes" TextProperty="Text" ValueProperty="Value"
+                                AllowClear="true" Placeholder="Any" Style="width: 100%" Change="@(async _ => await Reload())" />
+            </FilterTemplate>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="Invoice" Property="InvoiceStatus" Title="Status" Width="200px" FilterValue="@statusFilter" FilterOperator="FilterOperator.Equals">
+            <FilterTemplate>
+                <RadzenDropDown @bind-Value="statusFilter" Data="@statusOptions" TextProperty="Text" ValueProperty="Value" TValue="int?"
+                                AllowClear="true" Placeholder="Any" Style="width: 100%" Change="@(async _ => await Reload())" />
+            </FilterTemplate>
+            <Template Context="row">
+                <RadzenBadge BadgeStyle="@StatusStyle(row.Status)" Text="@row.StatusName" IsPill="true" />
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="Invoice" Property="InvoiceDate" Title="Invoice date" FormatString="{0:yyyy-MM-dd}" Width="120px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="Amount" Title="Amount" FormatString="{0:N2}" Width="120px" TextAlign="TextAlign.Right" />
+        <RadzenDataGridColumn TItem="Invoice" Property="Currency.Code" Title="Cur." Width="80px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="Bottler.Name" Title="Bottler" MinWidth="160px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="Payer.Name" Title="Payer" MinWidth="160px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="SalesCenter.Name" Title="Sales center" MinWidth="160px" Visible="false" />
+        <RadzenDataGridColumn TItem="Invoice" Property="ProgramId" Title="Program" Width="130px" />
+        <RadzenDataGridColumn TItem="Invoice" Property="PoNumber" Title="PO #" Width="120px" Visible="false" />
+        <RadzenDataGridColumn TItem="Invoice" Property="UserEmail" Title="Submitted by" Width="220px" Visible="false" />
+        <RadzenDataGridColumn TItem="Invoice" Property="RevisionNumber" Title="Rev." Width="70px" Visible="false" />
+        <RadzenDataGridColumn TItem="Invoice" Property="HasPayment" Title="Paid" Width="80px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                @if (row.HasPayment)
+                {
+                    <RadzenIcon Icon="paid" IconColor="@Colors.Success" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="Invoice" Property="CreatedAt" Title="Created (UTC)" FormatString="{0:yyyy-MM-dd HH:mm}" Width="150px" SortOrder="SortOrder.Descending" />
+        <RadzenDataGridColumn TItem="Invoice" Property="UpdatedAt" Title="Updated (UTC)" FormatString="{0:yyyy-MM-dd HH:mm}" Width="150px" Visible="false" />
+        <RadzenDataGridColumn TItem="Invoice" Filterable="false" Sortable="false" Pickable="false" Width="110px" TextAlign="TextAlign.Center" Frozen="true" FrozenPosition="FrozenColumnPosition.Right">
+            <Template Context="row">
+                @if (row.IsSoftDeleted)
+                {
+                    <RadzenButton Icon="restore_from_trash" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success" Variant="Variant.Text" Click="@(() => Restore(row))" title="Restore" />
+                }
+                else
+                {
+                    <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Edit(row))" title="Edit" />
+                    <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(() => Delete(row))" title="Mark deleted" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    private static readonly IEnumerable<int> pageSizes = [10, 20, 50, 100];
+    private readonly IReadOnlyList<EnumOption<InvoiceStatus>> statusOptionsTyped = EnumDisplay.Options<InvoiceStatus>();
+    private IEnumerable<object> statusOptions => statusOptionsTyped.Select(o => new { Value = (int?)(int)o.Value, o.Text });
+    private int? statusFilter;
+    private string? typeFilter;
+
+    protected override string EntityName => "Invoice";
+    protected override object KeyOf(Invoice e) => e.Id;
+    protected override string Describe(Invoice e) => $"invoice {e.DisplayName}";
+    protected override string DialogWidth => "960px";
+
+    protected override IQueryable<Invoice> Shape(IQueryable<Invoice> q)
+    {
+        q = q.Include(i => i.Bottler).Include(i => i.Payer).Include(i => i.SalesCenter).Include(i => i.Currency);
+        if (!string.IsNullOrEmpty(typeFilter))
+        {
+            q = q.Where(i => i.InvoiceType == typeFilter);
+        }
+        return q;
+    }
+
+    protected override void OnInitialized()
+    {
+        Service.DefaultOrder = q => q.OrderByDescending(i => i.Id);
+    }
+
+    private static BadgeStyle StatusStyle(InvoiceStatus status) => status switch
+    {
+        InvoiceStatus.Completed or InvoiceStatus.Paid => BadgeStyle.Success,
+        InvoiceStatus.Cancelled or InvoiceStatus.CancellationRequested => BadgeStyle.Danger,
+        InvoiceStatus.Draft => BadgeStyle.Light,
+        InvoiceStatus.InfoRequired or InvoiceStatus.NeedsAdditionalInfoRep or InvoiceStatus.NeedsAdditionalInfoLead => BadgeStyle.Warning,
+        InvoiceStatus.Revised => BadgeStyle.Secondary,
+        _ => BadgeStyle.Info,
+    };
+
+    private void RowRender(RowRenderEventArgs<Invoice> args)
+    {
+        if (args.Data is { IsSoftDeleted: true })
+        {
+            args.Attributes["style"] = "opacity: 0.55;";
+        }
+    }
+}

@@ -1,0 +1,60 @@
+@page "/programs"
+@inherits CrudPageBase<Program, ProgramDialog>
+
+<PageTitle>Programs</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Programs</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="1rem" AlignItems="AlignItems.Center">
+        <RadzenSwitch Value="@ShowDeleted" Change="@(async (bool v) => await ToggleShowDeleted(v))" Name="ShowDeleted" />
+        <RadzenLabel Text="Show deleted" Component="ShowDeleted" />
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@Reload" title="Refresh" />
+        <RadzenButton Icon="add" Text="New program" Click="@Add" />
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenDataGrid @ref="Grid" TItem="Program" Data="@Items" Count="@Count" LoadData="@LoadData" IsLoading="@IsLoading"
+                AllowFiltering="true" FilterMode="FilterMode.SimpleWithMenu" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="true" AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                AllowColumnResize="true" Density="Density.Compact" EmptyText="No programs."
+                RowRender="@RowRender">
+    <Columns>
+        <RadzenDataGridColumn TItem="Program" Property="Id" Title="Program Id" Width="130px" />
+        <RadzenDataGridColumn TItem="Program" Property="Name" Title="Name" />
+        <RadzenDataGridColumn TItem="Program" Property="Bottler.Name" Title="Bottler" />
+        <RadzenDataGridColumn TItem="Program" Property="From" Title="From" FormatString="{0:yyyy-MM-dd}" Width="110px" />
+        <RadzenDataGridColumn TItem="Program" Property="To" Title="To" FormatString="{0:yyyy-MM-dd}" Width="110px" />
+        <RadzenDataGridColumn TItem="Program" Property="CoOpPercentage" Title="Co-op %" FormatString="{0:N2}" Width="100px" TextAlign="TextAlign.Right" />
+        <RadzenDataGridColumn TItem="Program" Property="CoOpAmount" Title="Co-op amount" FormatString="{0:N2}" Width="130px" TextAlign="TextAlign.Right" />
+        <RadzenDataGridColumn TItem="Program" Property="AmountSettled" Title="Settled" FormatString="{0:N2}" Width="120px" TextAlign="TextAlign.Right" />
+        <RadzenDataGridColumn TItem="Program" Property="FundingElementId" Title="Funding element" Width="130px" />
+        <RadzenDataGridColumn TItem="Program" Filterable="false" Sortable="false" Width="120px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                @if (row.IsSoftDeleted)
+                {
+                    <RadzenButton Icon="restore_from_trash" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Success" Variant="Variant.Text" Click="@(() => Restore(row))" title="Restore" />
+                }
+                else
+                {
+                    <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Edit(row))" title="Edit" />
+                    <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(() => Delete(row))" title="Mark deleted" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    protected override string EntityName => "Program";
+    protected override object KeyOf(Program e) => e.Id;
+    protected override string Describe(Program e) => $"program {e.Id}";
+    protected override IQueryable<Program> Shape(IQueryable<Program> q) => q.Include(p => p.Bottler);
+
+    private void RowRender(RowRenderEventArgs<Program> args)
+    {
+        if (args.Data is { IsSoftDeleted: true })
+        {
+            args.Attributes["style"] = "opacity: 0.55; text-decoration: line-through;";
+        }
+    }
+}

@@ -1,0 +1,156 @@
+# Invoice Portal Admin (proof of concept)
+
+Blazor Web App (.NET 10, Interactive Server) with Radzen components that manages a **local** copy
+of the Invoice Portal database. Everything runs in Docker Compose:
+
+| Service   | What it is                                                                                  |
+|-----------|---------------------------------------------------------------------------------------------|
+| `sql`     | SQL Server 2022 **Express** (`mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express`) |
+| `db-init` | One-shot .NET console app that restores `mec-invoiceportal-prod.bacpac` into `sql` (DacFx)  |
+| `app`     | The Blazor admin UI on <http://localhost:8080>                                              |
+
+No connection to Azure is made by any of these. `.env.Development` in this folder is **not** read by
+any code; it was only used once, read-only, to inspect the schema.
+
+## Prerequisites
+
+- Docker Desktop with Linux containers and **at least 4 GB of memory** (Settings -> Resources).
+  The SQL Server image refuses to start below 2 GB; `db-init` checks and fails fast with a message.
+- `mec-invoiceportal-prod.bacpac` in this folder (it is git-ignored).
+- For host-side development only: .NET SDK 10.
+
+## Run
+
+```bash
+docker compose up --build
+```
+
+Then open <http://localhost:8080>. The first run takes a few minutes (image pulls, build, and the
+bacpac import, roughly one minute for ~744k rows). Subsequent runs skip the import because `db-init`
+exits immediately when the database already exists.
+
+Reset the database to the bacpac contents:
+
+```bash
+docker compose down -v
+```
+
+## What `db-init` does
+
+Azure SQL bacpacs contain objects an on-premises SQL Server cannot create: Entra ID (external) users,
+their role memberships and grants, a database master key, a database scoped credential and the TDE
+flag. `db-init` writes a sanitised **copy** of the bacpac (the original is never modified), removes
+those elements from `model.xml`, rewrites the checksum in `Origin.xml`, and imports it with
+`Microsoft.SqlServer.DacFx`. If the import fails it drops the partial database so the next run retries.
+
+## Scope of the UI
+
+- **Invoices**: full CRUD with a tabbed edit dialog, server-side paging/sorting/filtering, column
+  picker, soft delete (`IsDeleted`) with a "Show deleted" toggle and Restore.
+- **Lookups**: Bottlers, Payers, Sales Centers, Programs (soft delete), Currencies. Bottlers, Payers
+  and Sales Centers use SAP-sourced ids, so Create asks for the Id and checks for duplicates.
+- Companies, Countries and Brand Segment Categories are scaffolded for dropdowns only.
+- **AI Insights** (`/ai/query`) and **Ask the documents** (header button, and per row on Bottlers): see
+  [AI features (mocked)](#ai-features-mocked).
+
+## Project layout
+
+```
+InvoicePortal.slnx
+docker-compose.yml, .env            compose definition and local SA password (git-ignored)
+InvoicePortal.DbInit/               bacpac sanitiser + importer (runs once)
+InvoicePortal.Admin/
+  Data/InvoicePortalDbContext.cs    EF Core scaffold output - never hand-edited
+  Data/Entities/*.cs                EF Core scaffold output - never hand-edited
+  Data/Entities/Partials/*.cs       partial classes: enum wrappers, display helpers, marker interfaces
+  Data/InvoicePortalDbContext.Partial.cs
+  Data/Enums/*.cs                   copied from the Invoice Portal backend domain project
+  Services/CrudService.cs           generic list/insert/update/delete, soft delete, friendly SQL errors
+  Services/LookupService.cs         cached dropdown sources
+  Components/Shared/CrudPageBase.cs, EditDialogBase.cs   shared page / dialog behaviour
+  Components/Pages/Invoices/, Components/Pages/Lookups/  one grid + one dialog per table
+  Ai/                               AI slice: options, DI, mock model, NL-to-SQL guard/executor, document Q&A
+  Components/Pages/Ai/              AiQuery.razor (NL query + dynamic grid), AskDocumentsDialog.razor
+InvoicePortal.Admin.Tests/          xUnit tests for the AI slice (no database needed)
+```
+
+### Re-scaffolding the model
+
+Generated files are never edited by hand, so the scaffold can be re-run at any time against the
+local container (the connection string is the one in `appsettings.Development.json`):
+
+```bash
+dotnet ef dbcontext scaffold "Server=localhost,1433;Database=InvoicePortal;User Id=sa;Password=<see .env>;Encrypt=True;TrustServerCertificate=True" Microsoft.EntityFrameworkCore.SqlServer --project InvoicePortal.Admin -o Data/Entities -c InvoicePortalDbContext --context-dir Data --namespace InvoicePortal.Admin.Data.Entities --context-namespace InvoicePortal.Admin.Data --no-onconfiguring --data-annotations --force -t Invoices -t Bottlers -t Payers -t SalesCenters -t Programs -t Currencies -t Companies -t Countries -t BrandSegmentCategories
+```
+
+## AI features (mocked)
+
+The AI features reproduce the two headline patterns of
+[DanWahlin/customer-insights](https://github.com/DanWahlin/customer-insights) (an Angular + Express demo of
+Azure AI Foundry models, Foundry IQ, Microsoft Graph and Azure Communication Services) inside this Blazor app,
+with **every external service replaced by an in-process mock**. Nothing leaves the machine and no keys are needed.
+
+| customer-insights                                    | Here                                                                 |
+|------------------------------------------------------|----------------------------------------------------------------------|
+| GPT model via Azure OpenAI                           | `MockChatClient` behind `Microsoft.Extensions.AI.IChatClient`        |
+| `/generateSql`: NL -> SQL, read-only txn, dynamic grid | `/ai/query`: NL -> T-SQL, `SqlGuard` + rollback-only executor, Radzen dynamic grid |
+| Foundry IQ knowledge-base retrieve + `[S#]` citations | `InMemoryDocumentRetriever` (seeded docs, BM25, threshold, dedupe) + `CitationSelector` |
+| Chat help dialog                                     | "Ask the documents" dialog (header button; per-row on Bottlers, the "customer" here) |
+| Email/SMS, Graph, phone (ACS)                        | not included                                                         |
+
+What is real and what is fake:
+
+- **Real**: the system prompts (schema generated from the EF model), JSON contract parsing, SQL validation
+  (`Ai/Query/SqlGuard.cs`), execution (5 s command timeout, `LOCK_TIMEOUT`, 200-row cap, transaction always
+  rolled back), retrieval -> prompt -> citation validation, rate limiting (10/min per circuit), feature flags.
+- **Fake**: the model (`Ai/Chat/MockChatClient.cs` routes on the system prompt: `SqlIntentCatalog` maps a
+  dozen regex intents to parameterised T-SQL; `MockAnswerSynthesizer` stitches the most relevant sentences of
+  the retrieved chunks and cites them) and the index (`Ai/Documents/SeedDocuments.cs`: six fictional documents
+  whose placeholders are filled with the four busiest bottler names from the local database at first use).
+
+Configuration (`appsettings.json`, overridable with environment variables as in `docker-compose.yml`):
+
+| Key                        | Default | Effect                                                       |
+|----------------------------|---------|--------------------------------------------------------------|
+| `Ai__Enabled`              | `true`  | Hides all AI entry points and makes `/ai/query` refuse when false |
+| `Ai__DocumentChatEnabled`  | `true`  | Gates the "Ask the documents" dialog                         |
+| `Ai__Provider`             | `Mock`  | Only registered provider; see below                          |
+
+Swapping in a real model is one registration in `Ai/AiServiceCollectionExtensions.cs` (add a `case` that calls
+`AddChatClient(...)` with a real `IChatClient`, e.g. Azure OpenAI's `.AsIChatClient()`), plus a real
+`IDocumentRetriever` if you want Foundry IQ instead of the seeded index. Nothing else changes.
+
+SQL Server caveat: unlike the PostgreSQL `READ ONLY` transaction the reference relies on, SQL Server has no
+engine-level read-only transaction. Safety here is guard-based (single SELECT/WITH, keyword denylist, `@p0..`
+parameters only, no comments or `@@` variables) plus timeout, lock timeout, row cap and rollback. For anything
+beyond a local POC, point the executor at a `db_datareader` login as well.
+
+Tests (no database needed):
+
+```bash
+dotnet test InvoicePortal.slnx
+```
+
+## Host-side development
+
+With the `sql` container running (`docker compose up -d sql db-init`):
+
+```bash
+dotnet run --project InvoicePortal.Admin --launch-profile http
+```
+
+`appsettings.Development.json` points at `localhost,1433` with the same throwaway SA password as `.env`.
+
+## Troubleshooting
+
+- `docker compose up` hangs at "Container invoiceportal-db-init Starting" while `docker ps` still works:
+  the Docker Desktop engine has wedged on that container (seen once on the Hyper-V backend; `docker start`,
+  `docker inspect` and `docker rm` on it all time out). Quit and reopen Docker Desktop, then run
+  `docker compose up -d` again. The SQL data volume survives the restart.
+- SQL container exits immediately: Docker Desktop memory is below 2 GB (see Prerequisites).
+
+## Data caveat
+
+The bacpac is a copy of production data (invoices, user emails). It lives only on the local Docker
+volume `mssql-data`; `.gitignore` excludes `*.bacpac` and `.env*`. Do not push the volume or the
+bacpac anywhere.

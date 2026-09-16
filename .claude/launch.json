@@ -1,0 +1,15 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "admin-host",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "InvoicePortal.Admin/InvoicePortal.Admin.csproj", "--launch-profile", "http"],
+      "port": 5098
+    },
+    {
+      "name": "admin-docker",
+      "url": "http://localhost:8080"
+    }
+  ]
+}

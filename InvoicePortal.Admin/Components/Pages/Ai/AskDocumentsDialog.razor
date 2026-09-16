@@ -1,0 +1,156 @@
+@using System.Text.RegularExpressions
+@inject IDocumentAnswerService Answers
+@inject DialogService DialogService
+
+<RadzenStack Gap="1rem">
+    <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-0">
+        Grounded Q&amp;A over the indexed customer documents. The answer cites its sources with labels such as
+        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="S1" />; only cited documents are listed.
+    </RadzenText>
+
+    <form @onsubmit="Ask">
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem" AlignItems="AlignItems.Center">
+            <RadzenTextBox @bind-Value="question" Name="Question" Style="flex: 1"
+                           Placeholder="Ask a question about the indexed customer documents" Disabled="@busy" />
+            <RadzenButton ButtonType="ButtonType.Submit" Icon="send" Text="Ask" IsBusy="@busy" BusyText="Asking…"
+                          Disabled="@(busy || string.IsNullOrWhiteSpace(question))" />
+        </RadzenStack>
+    </form>
+
+    @if (busy)
+    {
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.75rem">
+            <RadzenProgressBarCircular ProgressBarStyle="ProgressBarStyle.Primary" Mode="ProgressBarMode.Indeterminate" ShowValue="false" Size="ProgressBarCircularSize.Small" />
+            <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">Searching the indexed documents…</RadzenText>
+        </RadzenStack>
+    }
+    else if (error is not null)
+    {
+        <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="false">@error</RadzenAlert>
+    }
+    else if (result is not null)
+    {
+        <RadzenCard Variant="Variant.Outlined">
+            <RadzenText TextStyle="TextStyle.Overline" class="rz-mb-2">Answer</RadzenText>
+            <RadzenText TextStyle="TextStyle.Body1" class="rz-mb-0" Style="white-space: pre-wrap; line-height: 1.7">
+                @foreach (var part in AnswerParts(result.Answer))
+                {
+                    if (part.IsLabel)
+                    {
+                        <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@part.Text" title="@TitleFor(part.Text)" class="rz-mx-1" />
+                    }
+                    else
+                    {
+                        <span>@part.Text</span>
+                    }
+                }
+            </RadzenText>
+        </RadzenCard>
+
+        @if (result.Citations.Count == 0)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Info" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="false">
+                No documents were cited. Try mentioning a bottler name or a topic such as supplies, co-op, sampling or statuses.
+            </RadzenAlert>
+        }
+        else
+        {
+            <RadzenText TextStyle="TextStyle.Overline" class="rz-mb-0">Sources</RadzenText>
+            <RadzenStack Gap="0.5rem">
+                @foreach (var citation in result.Citations)
+                {
+                    <RadzenCard Variant="Variant.Filled" class="rz-p-3">
+                        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" Wrap="FlexWrap.Wrap">
+                            <RadzenBadge BadgeStyle="BadgeStyle.Info" IsPill="true" Text="@citation.Label" />
+                            <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">@citation.Title</RadzenText>
+                            @if (!string.IsNullOrEmpty(citation.CustomerName))
+                            {
+                                <RadzenBadge BadgeStyle="BadgeStyle.Secondary" Variant="Variant.Outlined" Text="@citation.CustomerName" />
+                            }
+                        </RadzenStack>
+                        <RadzenText TextStyle="TextStyle.Caption" class="rz-color-secondary rz-mb-1">@citation.SourcePath</RadzenText>
+                        @if (!string.IsNullOrEmpty(citation.SourceUrl))
+                        {
+                            <RadzenLink Path="@citation.SourceUrl" Target="_blank" Text="Open source" Icon="open_in_new" />
+                        }
+                        else
+                        {
+                            <RadzenButton Variant="Variant.Text" Size="ButtonSize.ExtraSmall" Icon="@(expanded.Contains(citation.Id) ? "expand_less" : "expand_more")"
+                                          Text="@(expanded.Contains(citation.Id) ? "Hide excerpt" : "Show excerpt")" Click="@(() => ToggleExcerpt(citation.Id))" />
+                            @if (expanded.Contains(citation.Id))
+                            {
+                                <RadzenText TextStyle="TextStyle.Body2" class="rz-mt-1 rz-mb-0" Style="font-style: italic">@citation.Snippet</RadzenText>
+                            }
+                        }
+                    </RadzenCard>
+                }
+            </RadzenStack>
+        }
+    }
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End">
+        <RadzenButton Text="Close" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close())" />
+    </RadzenStack>
+</RadzenStack>
+
+@code {
+    [Parameter] public string? Question { get; set; }
+
+    private string question = string.Empty;
+    private bool busy;
+    private string? error;
+    private DocumentAnswer? result;
+    private readonly HashSet<string> expanded = [];
+
+    private sealed record AnswerPart(string Text, bool IsLabel);
+
+    protected override async Task OnInitializedAsync()
+    {
+        question = string.IsNullOrWhiteSpace(Question) ? await Answers.DefaultQuestionAsync() : Question;
+    }
+
+    private async Task Ask()
+    {
+        if (busy || string.IsNullOrWhiteSpace(question))
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        result = null;
+        expanded.Clear();
+        try
+        {
+            result = await Answers.AskAsync(question);
+        }
+        catch (AiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (Exception ex)
+        {
+            error = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void ToggleExcerpt(string id)
+    {
+        if (!expanded.Remove(id))
+        {
+            expanded.Add(id);
+        }
+    }
+
+    private static IEnumerable<AnswerPart> AnswerParts(string answer)
+        => Regex.Split(answer, @"(\[S\d+\])")
+            .Where(p => p.Length > 0)
+            .Select(p => new AnswerPart(CitationSelector.LabelPattern().IsMatch(p) ? p.Trim('[', ']') : p, CitationSelector.LabelPattern().IsMatch(p)));
+
+    private string TitleFor(string label)
+        => result?.Citations.FirstOrDefault(c => c.Label == label)?.Title ?? label;
+}

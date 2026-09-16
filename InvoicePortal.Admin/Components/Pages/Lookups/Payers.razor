@@ -1,0 +1,47 @@
+@page "/payers"
+@inherits CrudPageBase<Payer, PayerDialog>
+
+<PageTitle>Payers</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Payers</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@Reload" title="Refresh" />
+        <RadzenButton Icon="add" Text="New payer" Click="@Add" />
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenDataGrid @ref="Grid" TItem="Payer" Data="@Items" Count="@Count" LoadData="@LoadData" IsLoading="@IsLoading"
+                AllowFiltering="true" FilterMode="FilterMode.SimpleWithMenu" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="true" AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                AllowColumnResize="true" Density="Density.Compact" EmptyText="No payers.">
+    <Columns>
+        <RadzenDataGridColumn TItem="Payer" Property="Id" Title="Id" Width="100px" />
+        <RadzenDataGridColumn TItem="Payer" Property="Name" Title="Name" />
+        <RadzenDataGridColumn TItem="Payer" Property="Bottler.Name" Title="Bottler" />
+        <RadzenDataGridColumn TItem="Payer" Property="City" Title="City" Width="140px" />
+        <RadzenDataGridColumn TItem="Payer" Property="State" Title="State" Width="80px" />
+        <RadzenDataGridColumn TItem="Payer" Property="VendorId" Title="Vendor Id" Width="110px" />
+        <RadzenDataGridColumn TItem="Payer" Property="DoNotUse" Title="Do not use" Width="110px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                @if (row.DoNotUse == true)
+                {
+                    <RadzenBadge BadgeStyle="BadgeStyle.Danger" Text="yes" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="Payer" Filterable="false" Sortable="false" Width="110px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Edit(row))" title="Edit" />
+                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(() => Delete(row))" title="Delete" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    protected override string EntityName => "Payer";
+    protected override object KeyOf(Payer e) => e.Id;
+    protected override string Describe(Payer e) => $"payer {e.Id} ({e.Name})";
+    protected override IQueryable<Payer> Shape(IQueryable<Payer> q) => q.Include(p => p.Bottler);
+}

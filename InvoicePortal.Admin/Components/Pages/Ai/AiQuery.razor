@@ -1,0 +1,186 @@
+@page "/ai/query"
+@using InvoicePortal.Admin.Ai.Chat
+@using Microsoft.Data.SqlClient
+@inject IQueryGenerationService Generator
+@inject ISqlQueryExecutor Executor
+@inject IOptions<AiOptions> Ai
+
+<PageTitle>AI Insights</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem" class="rz-mb-1">
+    <RadzenIcon Icon="auto_awesome" />
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">AI Insights</RadzenText>
+</RadzenStack>
+<RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
+    Ask a question about the invoice data in plain English. The model writes a read-only SQL query, the app validates and runs it,
+    and the results appear below. Provider: <b>@Ai.Value.Provider</b> (pattern-matched intents; the prompt, guards and execution are real).
+</RadzenText>
+
+@if (!Ai.Value.Enabled)
+{
+    <RadzenAlert AlertStyle="AlertStyle.Warning" AllowClose="false">AI features are disabled (Ai:Enabled = false).</RadzenAlert>
+    return;
+}
+
+<RadzenCard class="rz-mb-4">
+    <RadzenStack Gap="0.75rem">
+        <RadzenLabel Text="Question or reporting request" Component="Prompt" />
+        <RadzenTextArea @bind-Value="prompt" Name="Prompt" Rows="3" Style="width: 100%"
+                        Placeholder="Example: Top 5 payers by total amount" Disabled="@busy" />
+
+        <RadzenStack Orientation="Orientation.Horizontal" Wrap="FlexWrap.Wrap" Gap="0.25rem" AlignItems="AlignItems.Center">
+            <RadzenText TextStyle="TextStyle.Caption" class="rz-mb-0 rz-mr-1">Try:</RadzenText>
+            @foreach (var example in SqlIntentCatalog.Examples)
+            {
+                <RadzenButton Text="@example" Size="ButtonSize.ExtraSmall" Variant="Variant.Outlined" ButtonStyle="ButtonStyle.Secondary"
+                              Click="@(() => prompt = example)" Disabled="@busy" />
+            }
+        </RadzenStack>
+
+        <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+            <RadzenButton Icon="play_arrow" Text="Run query" Click="@Run" IsBusy="@busy" BusyText="Running…"
+                          Disabled="@(busy || string.IsNullOrWhiteSpace(prompt))" />
+            <RadzenButton Icon="restart_alt" Text="Reset data" ButtonStyle="ButtonStyle.Light" Click="@Reset" Disabled="@busy" />
+        </RadzenStack>
+
+        @if (error is not null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" AllowClose="true" Close="@(() => error = null)">
+                @error
+            </RadzenAlert>
+        }
+    </RadzenStack>
+</RadzenCard>
+
+@if (result is not null)
+{
+    <RadzenPanel AllowCollapse="true" Collapsed="true" class="rz-mb-4">
+        <HeaderTemplate>
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenIcon Icon="code" />
+                <RadzenText TextStyle="TextStyle.Subtitle2" class="rz-mb-0">Generated SQL</RadzenText>
+            </RadzenStack>
+        </HeaderTemplate>
+        <ChildContent>
+            <pre class="rz-m-0" style="white-space: pre-wrap; font-size: 0.8rem;">@result.Sql</pre>
+            @if (result.ParamValues.Count > 0)
+            {
+                <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2 rz-mb-0">
+                    Parameters: @string.Join(", ", result.ParamValues.Select((v, i) => $"@p{i} = {FormatCell(v)}"))
+                </RadzenText>
+            }
+        </ChildContent>
+    </RadzenPanel>
+
+    <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.SpaceBetween" AlignItems="AlignItems.Center" class="rz-mb-2">
+        <RadzenText TextStyle="TextStyle.Body2" class="rz-mb-0">
+            Showing @filteredRows.Count.ToString("N0") of @result.Rows.Count.ToString("N0") rows@(result.Truncated ? $" (first {Ai.Value.MaxRows} only)" : "")
+        </RadzenText>
+        <RadzenTextBox Placeholder="Filter results" Value="@filter" @oninput="@((ChangeEventArgs e) => ApplyFilter(e.Value?.ToString()))" Style="width: 280px" />
+    </RadzenStack>
+
+    <RadzenDataGrid @key="result" TItem="IDictionary<string, object>" Data="@filteredRows" Count="@filteredRows.Count"
+                    AllowSorting="true" AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                    AllowColumnResize="true" Density="Density.Compact" EmptyText="No rows returned.">
+        <Columns>
+            @foreach (var col in visibleColumns)
+            {
+                <RadzenDataGridColumn TItem="IDictionary<string, object>" @key="col.Name" Title="@col.Name" Type="@col.ClrType"
+                                      Property="@PropertyAccess.GetDynamicPropertyExpression(col.Name, col.ClrType)"
+                                      TextAlign="@(col.IsNumeric ? TextAlign.Right : TextAlign.Left)">
+                    <Template Context="row">@FormatCell(row.TryGetValue(col.Name, out var v) ? v : null)</Template>
+                </RadzenDataGridColumn>
+            }
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private const string DefaultPrompt = "Get the total invoice amount for all invoices. Group by bottler and include the country.";
+
+    private string prompt = DefaultPrompt;
+    private string filter = string.Empty;
+    private bool busy;
+    private string? error;
+    private QueryResult? result;
+    private IReadOnlyList<QueryColumn> visibleColumns = [];
+    private List<IDictionary<string, object>> filteredRows = [];
+
+    private async Task Run()
+    {
+        if (busy || string.IsNullOrWhiteSpace(prompt))
+        {
+            return;
+        }
+
+        busy = true;
+        error = null;
+        try
+        {
+            var generated = await Generator.GenerateAsync(prompt);
+            if (!generated.HasSql)
+            {
+                error = generated.Error ?? "The model did not return a query.";
+                return;
+            }
+
+            result = await Executor.ExecuteAsync(generated);
+            // Same convention as the reference UI: build columns from the result, hide a bare "id" column.
+            visibleColumns = result.Columns.Where(c => !string.Equals(c.Name, "id", StringComparison.OrdinalIgnoreCase)).ToList();
+            filter = string.Empty;
+            ApplyFilter(filter);
+        }
+        catch (AiException ex)
+        {
+            error = ex.Message;
+        }
+        catch (SqlException ex)
+        {
+            error = $"The database rejected the query: {ex.Message}";
+        }
+        catch (Exception ex)
+        {
+            error = $"Unexpected error: {ex.Message}";
+        }
+        finally
+        {
+            busy = false;
+        }
+    }
+
+    private void Reset()
+    {
+        prompt = DefaultPrompt;
+        result = null;
+        error = null;
+        filter = string.Empty;
+        visibleColumns = [];
+        filteredRows = [];
+    }
+
+    private void ApplyFilter(string? value)
+    {
+        filter = value ?? string.Empty;
+        if (result is null)
+        {
+            filteredRows = [];
+            return;
+        }
+
+        filteredRows = string.IsNullOrWhiteSpace(filter)
+            ? result.Rows.ToList()
+            : result.Rows.Where(r => r.Values.Any(v => FormatCell(v).Contains(filter, StringComparison.OrdinalIgnoreCase))).ToList();
+    }
+
+    private static string FormatCell(object? value) => value switch
+    {
+        null => string.Empty,
+        decimal d => d.ToString("N2"),
+        double d => d.ToString("N2"),
+        float f => f.ToString("N2"),
+        DateOnly d => d.ToString("yyyy-MM-dd"),
+        DateTime dt => dt.TimeOfDay == TimeSpan.Zero ? dt.ToString("yyyy-MM-dd") : dt.ToString("yyyy-MM-dd HH:mm"),
+        bool b => b ? "Yes" : "No",
+        _ => value.ToString() ?? string.Empty,
+    };
+}

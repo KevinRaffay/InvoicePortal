@@ -1,0 +1,49 @@
+@inherits LayoutComponentBase
+@using InvoicePortal.Admin.Components.Pages.Ai
+@inject DialogService DialogService
+@inject IOptions<AiOptions> Ai
+
+<RadzenComponents />
+
+<RadzenLayout>
+    <RadzenHeader>
+        <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" Gap="0.5rem" class="rz-px-3" Style="width: 100%">
+            <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
+                <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
+                <RadzenIcon Icon="receipt_long" />
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Invoice Portal Admin</RadzenText>
+                <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="LOCAL POC" class="rz-ml-2" />
+            </RadzenStack>
+            @if (Ai.Value.Enabled && Ai.Value.DocumentChatEnabled)
+            {
+                <RadzenButton Icon="quiz" Text="Ask the documents" ButtonStyle="ButtonStyle.Light" Variant="Variant.Outlined" Size="ButtonSize.Small"
+                              Click="@OpenAskDocuments" title="Ask a question about the indexed customer documents" />
+            }
+        </RadzenStack>
+    </RadzenHeader>
+    <RadzenSidebar @bind-Expanded="sidebarExpanded">
+        <NavMenu />
+    </RadzenSidebar>
+    <RadzenBody>
+        <div class="rz-p-4">
+            @Body
+        </div>
+    </RadzenBody>
+</RadzenLayout>
+
+<div id="blazor-error-ui" data-nosnippet>
+    An unhandled error has occurred.
+    <a href="." class="reload">Reload</a>
+    <span class="dismiss">🗙</span>
+</div>
+
+@code {
+    private bool sidebarExpanded = true;
+
+    private async Task OpenAskDocuments()
+    {
+        await DialogService.OpenAsync<AskDocumentsDialog>("Ask the documents",
+            new Dictionary<string, object?>(),
+            new DialogOptions { Width = "720px", Resizable = true, Draggable = true });
+    }
+}

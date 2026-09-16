@@ -1,0 +1,43 @@
+/* App-level styles. Radzen's Material theme supplies component styling. */
+
+/* Blazor reconnect / unhandled-error banner (shown by blazor.web.js only when something breaks). */
+#blazor-error-ui {
+    display: none;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 2000;
+    padding: 0.75rem 1.25rem 0.75rem 1.25rem;
+    background: #b32121;
+    color: #fff;
+    box-shadow: 0 -1px 4px rgba(0, 0, 0, 0.3);
+}
+
+#blazor-error-ui .reload {
+    color: #fff;
+    text-decoration: underline;
+    margin-left: 0.75rem;
+}
+
+#blazor-error-ui .dismiss {
+    cursor: pointer;
+    position: absolute;
+    right: 1rem;
+    top: 0.75rem;
+}
+
+.blazor-error-boundary {
+    padding: 1rem;
+    background: #b32121;
+    color: #fff;
+}
+
+.blazor-error-boundary::after {
+    content: "An error has occurred.";
+}
+
+/* Keep long grids from forcing the page body to scroll horizontally. */
+.rz-data-grid {
+    max-width: 100%;
+}

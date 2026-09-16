@@ -1,0 +1,16 @@
+# Secrets / local config
+.env
+.env.*
+*.bacpac
+
+# Build output
+bin/
+obj/
+.vs/
+*.user
+*.suo
+TestResults/
+
+# OS
+.DS_Store
+Thumbs.db

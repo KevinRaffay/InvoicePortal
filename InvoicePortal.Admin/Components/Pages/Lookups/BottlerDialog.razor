@@ -1,0 +1,99 @@
+@inherits EditDialogBase<Bottler>
+
+<RadzenTemplateForm TItem="Bottler" Data="@Model" Submit="@(async (Bottler _) => await Submit())">
+    <RadzenStack Gap="1rem">
+        @if (Error is not null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@Error</RadzenAlert>
+        }
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Id (SAP bottler number)" Variant="Variant.Outlined" Style="width: 100%">
+                    <ChildContent>
+                        <RadzenNumeric Name="Id" @bind-Value="Model.Id" Disabled="@(!IsNew)" ShowUpDown="false" />
+                    </ChildContent>
+                    <Helper>
+                        @if (IsNew)
+                        {
+                            <RadzenNumericRangeValidator Component="Id" Min="1" Text="Id must be a positive number" />
+                        }
+                    </Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="8">
+                <RadzenFormField Text="Name" Variant="Variant.Outlined" Style="width: 100%">
+                    <ChildContent><RadzenTextBox Name="Name" @bind-Value="Model.Name" MaxLength="128" /></ChildContent>
+                    <Helper><RadzenRequiredValidator Component="Name" Text="Name is required" /></Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Sales organization" Variant="Variant.Outlined" Style="width: 100%">
+                    <ChildContent>
+                        <RadzenDropDown Name="SalesOrganization" @bind-Value="Model.SalesOrganization" Data="@salesOrgs" TextProperty="Text" ValueProperty="Value" AllowClear="false" />
+                    </ChildContent>
+                    <Helper><RadzenRequiredValidator Component="SalesOrganization" Text="Required" /></Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Currency" Variant="Variant.Outlined" Style="width: 100%">
+                    <ChildContent>
+                        <RadzenDropDown Name="CurrencyId" @bind-Value="Model.CurrencyId" Data="@currencies" TextProperty="Text" ValueProperty="Value" />
+                    </ChildContent>
+                    <Helper><RadzenNumericRangeValidator Component="CurrencyId" Min="1" Text="Currency is required" /></Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="4">
+                <RadzenFormField Text="Country" Variant="Variant.Outlined" Style="width: 100%">
+                    <ChildContent>
+                        <RadzenDropDown Name="CountryId" @bind-Value="Model.CountryId" Data="@countries" TextProperty="Text" ValueProperty="Value" />
+                    </ChildContent>
+                    <Helper><RadzenNumericRangeValidator Component="CountryId" Min="1" Text="Country is required" /></Helper>
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenRow Gap="1rem">
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Brand segment category" Variant="Variant.Outlined" Style="width: 100%">
+                    <RadzenDropDown @bind-Value="Model.BrandSegmentCategoryId" Data="@brandSegments" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                </RadzenFormField>
+            </RadzenColumn>
+            <RadzenColumn Size="12" SizeMD="6">
+                <RadzenFormField Text="Commercial manager Id" Variant="Variant.Outlined" Style="width: 100%">
+                    <RadzenNumeric @bind-Value="Model.CommercialManagerId" ShowUpDown="false" Placeholder="(none)" />
+                </RadzenFormField>
+            </RadzenColumn>
+        </RadzenRow>
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@Cancel" />
+            <RadzenButton ButtonType="ButtonType.Submit" Text="@(IsNew ? "Create" : "Save")" Icon="save" IsBusy="@IsBusy" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private IReadOnlyList<LookupService.Option<string>> salesOrgs = [];
+    private IReadOnlyList<LookupService.Option<int>> currencies = [];
+    private IReadOnlyList<LookupService.Option<int>> countries = [];
+    private IReadOnlyList<LookupService.Option<int>> brandSegments = [];
+
+    protected override Bottler CreateNew() => new() { Name = string.Empty, SalesOrganization = string.Empty };
+
+    protected override async Task OnModelLoadedAsync()
+    {
+        salesOrgs = await Lookups.SalesOrganizationsAsync();
+        currencies = await Lookups.CurrenciesAsync();
+        countries = await Lookups.CountriesAsync();
+        brandSegments = await Lookups.BrandSegmentCategoriesAsync();
+    }
+
+    protected override async Task<string?> ValidateAsync()
+    {
+        if (IsNew && await Service.ExistsAsync(Model.Id))
+        {
+            return $"A bottler with Id {Model.Id} already exists.";
+        }
+        return null;
+    }
+}

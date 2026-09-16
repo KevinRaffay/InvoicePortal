@@ -1,0 +1,46 @@
+@page "/sales-centers"
+@inherits CrudPageBase<SalesCenter, SalesCenterDialog>
+
+<PageTitle>Sales Centers</PageTitle>
+
+<RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" JustifyContent="JustifyContent.SpaceBetween" class="rz-mb-3">
+    <RadzenText TextStyle="TextStyle.H5" class="rz-mb-0">Sales Centers</RadzenText>
+    <RadzenStack Orientation="Orientation.Horizontal" Gap="0.5rem">
+        <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Light" Click="@Reload" title="Refresh" />
+        <RadzenButton Icon="add" Text="New sales center" Click="@Add" />
+    </RadzenStack>
+</RadzenStack>
+
+<RadzenDataGrid @ref="Grid" TItem="SalesCenter" Data="@Items" Count="@Count" LoadData="@LoadData" IsLoading="@IsLoading"
+                AllowFiltering="true" FilterMode="FilterMode.SimpleWithMenu" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                AllowSorting="true" AllowPaging="true" PageSize="20" PagerHorizontalAlign="HorizontalAlign.Right" ShowPagingSummary="true"
+                AllowColumnResize="true" Density="Density.Compact" EmptyText="No sales centers.">
+    <Columns>
+        <RadzenDataGridColumn TItem="SalesCenter" Property="Id" Title="Id" Width="100px" />
+        <RadzenDataGridColumn TItem="SalesCenter" Property="Name" Title="Name" />
+        <RadzenDataGridColumn TItem="SalesCenter" Property="Address" Title="Address" />
+        <RadzenDataGridColumn TItem="SalesCenter" Property="Payer.Name" Title="Payer" />
+        <RadzenDataGridColumn TItem="SalesCenter" Property="Payer.Bottler.Name" Title="Bottler" />
+        <RadzenDataGridColumn TItem="SalesCenter" Property="IsNonVipShipTo" Title="Non-VIP ship-to" Width="130px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                @if (row.IsNonVipShipTo)
+                {
+                    <RadzenIcon Icon="check" />
+                }
+            </Template>
+        </RadzenDataGridColumn>
+        <RadzenDataGridColumn TItem="SalesCenter" Filterable="false" Sortable="false" Width="110px" TextAlign="TextAlign.Center">
+            <Template Context="row">
+                <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Light" Click="@(() => Edit(row))" title="Edit" />
+                <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Text" Click="@(() => Delete(row))" title="Delete" />
+            </Template>
+        </RadzenDataGridColumn>
+    </Columns>
+</RadzenDataGrid>
+
+@code {
+    protected override string EntityName => "Sales center";
+    protected override object KeyOf(SalesCenter e) => e.Id;
+    protected override string Describe(SalesCenter e) => $"sales center {e.Id} ({e.Name})";
+    protected override IQueryable<SalesCenter> Shape(IQueryable<SalesCenter> q) => q.Include(s => s.Payer).ThenInclude(p => p.Bottler);
+}

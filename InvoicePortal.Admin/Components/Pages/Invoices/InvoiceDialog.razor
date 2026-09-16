@@ -1,0 +1,411 @@
+@inherits EditDialogBase<Invoice>
+
+<RadzenTemplateForm TItem="Invoice" Data="@Model" Submit="@(async (Invoice _) => await Submit())">
+    <RadzenStack Gap="1rem">
+        @if (Error is not null)
+        {
+            <RadzenAlert AlertStyle="AlertStyle.Danger" AllowClose="false">@Error</RadzenAlert>
+        }
+
+        <RadzenTabs RenderMode="TabRenderMode.Client">
+            <Tabs>
+                <RadzenTabsItem Text="Header">
+                    <RadzenRow Gap="1rem" class="rz-mt-2">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Invoice #" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.Number" MaxLength="32" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Type" Variant="Variant.Outlined" Style="width: 100%">
+                                <ChildContent>
+                                    <RadzenDropDown Name="InvoiceType" @bind-Value="Model.InvoiceType" Data="@LookupService.InvoiceTypes" TextProperty="Text" ValueProperty="Value" />
+                                </ChildContent>
+                                <Helper><RadzenRequiredValidator Component="InvoiceType" Text="Type is required" /></Helper>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Status" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.Status" Data="@statusOptions" TextProperty="Text" ValueProperty="Value" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Account type" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.AccountTypeValue" Data="@accountTypeOptions" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Invoice date" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDatePicker @bind-Value="Model.InvoiceDate" DateFormat="yyyy-MM-dd" AllowClear="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Amount" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.Amount" Step="0.01" Format="N2" ShowUpDown="false" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Currency" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.CurrencyId" Data="@currencies" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Co-op %" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.CoOpPercentage" Min="0" Max="100" Step="0.01" Format="N2" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="PO #" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.PoNumber" MaxLength="11" Disabled="@(Model.DoNotHavePoNumber == true)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3" class="rz-display-flex rz-align-items-center">
+                            <RadzenCheckBox @bind-Value="noPo" Name="DoNotHavePoNumber" TValue="bool" />
+                            <RadzenLabel Text="No PO number" Component="DoNotHavePoNumber" class="rz-ms-2" />
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="PO grand total" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.PoGrandTotal" Step="0.01" Format="N2" ShowUpDown="false" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="PO invoice #" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.PoInvoiceNumber" MaxLength="32" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Ref doc #" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.RefDocNumber" MaxLength="16" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Company" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.CompanyId" Data="@companies" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Country" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.CountryId" Data="@countries" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Brand segment" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.BrandSegmentCategoryId" Data="@brandSegments" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Parties &amp; program">
+                    <RadzenRow Gap="1rem" class="rz-mt-2">
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Bottler" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown Value="@Model.BottlerId" TValue="int?" Data="@bottlers" TextProperty="Text" ValueProperty="Value"
+                                                AllowClear="true" Placeholder="(none)" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                AllowVirtualization="true" Change="@(async v => await BottlerChanged(v as int?))" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Payer" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown Value="@Model.PayerId" TValue="int?" Data="@payers" TextProperty="Text" ValueProperty="Value"
+                                                AllowClear="true" Placeholder="(none)" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                AllowVirtualization="true" Change="@(async v => await PayerChanged(v as int?))" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Sales center" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.SalesCenterId" Data="@salesCenters" TextProperty="Text" ValueProperty="Value"
+                                                AllowClear="true" Placeholder="(none)" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                AllowVirtualization="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="Program" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.ProgramId" Data="@programs" TextProperty="Text" ValueProperty="Value"
+                                                AllowClear="true" Placeholder="@(Model.BottlerId is null ? "(select a bottler first)" : "(unlisted)")"
+                                                Disabled="@(Model.BottlerId is null)" AllowVirtualization="true"
+                                                AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="8">
+                            <RadzenFormField Text="Unlisted program name" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.UnlistedProgramName" MaxLength="4000" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Promo period from" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDatePicker @bind-Value="Model.PromoPeriodFrom" DateFormat="yyyy-MM-dd" AllowClear="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Promo period to" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDatePicker @bind-Value="Model.PromoPeriodTo" DateFormat="yyyy-MM-dd" AllowClear="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Unlisted program type Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.UnlistedProgramTypeId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Samples purpose Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.SamplesPurposeId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Submitter">
+                    <RadzenRow Gap="1rem" class="rz-mt-2">
+                        <RadzenColumn Size="12">
+                            <RadzenFormField Text="Portal user (AspNetUsers)" Variant="Variant.Outlined" Style="width: 100%">
+                                <ChildContent>
+                                    <RadzenDropDown Value="@Model.UserId" TValue="Guid" Data="@users" TextProperty="UserEmail" ValueProperty="UserId"
+                                                    AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                                                    Change="@(v => UserChanged(v as Guid?))" />
+                                </ChildContent>
+                                <Helper>
+                                    <RadzenText TextStyle="TextStyle.Caption">Required foreign key. The list shows the 50 most recent submitters; the Id can also be typed below.</RadzenText>
+                                </Helper>
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="User Id (GUID)" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="userIdText" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="User name" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.UserName" MaxLength="256" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="4">
+                            <RadzenFormField Text="User email" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenTextBox @bind-Value="Model.UserEmail" MaxLength="256" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                </RadzenTabsItem>
+
+                <RadzenTabsItem Text="Revision &amp; SAP">
+                    <RadzenRow Gap="1rem" class="rz-mt-2">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Revision #" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.RevisionNumber" Min="0" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Revised invoice Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.RevisedInvoiceId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Revision date (UTC)" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDatePicker @bind-Value="Model.RevisionDate" ShowTime="true" DateFormat="yyyy-MM-dd HH:mm" AllowClear="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Revision reason" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDropDown @bind-Value="Model.RevisionReasonValue" Data="@revisionReasonOptions" TextProperty="Text" ValueProperty="Value" AllowClear="true" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenRow Gap="1rem">
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Claim Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.ClaimId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Exported to SAP (UTC)" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenDatePicker @bind-Value="Model.ExportedToSap" ShowTime="true" DateFormat="yyyy-MM-dd HH:mm" AllowClear="true" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Cancellation category Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.CancellationCategoryId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                        <RadzenColumn Size="12" SizeMD="3">
+                            <RadzenFormField Text="Finalized details Id" Variant="Variant.Outlined" Style="width: 100%">
+                                <RadzenNumeric @bind-Value="Model.InvoiceFinalizedDetailsId" ShowUpDown="false" Placeholder="(none)" />
+                            </RadzenFormField>
+                        </RadzenColumn>
+                    </RadzenRow>
+                    <RadzenStack Orientation="Orientation.Horizontal" Gap="2rem" Wrap="FlexWrap.Wrap" class="rz-mt-2">
+                        <div>
+                            <RadzenCheckBox @bind-Value="Model.HasPayment" Name="HasPayment" TValue="bool" />
+                            <RadzenLabel Text="Has payment" Component="HasPayment" class="rz-ms-2" />
+                        </div>
+                        <div>
+                            <RadzenCheckBox @bind-Value="Model.AutoGenerateInvoiceAttachment" Name="AutoGen" TValue="bool" />
+                            <RadzenLabel Text="Auto-generate attachment" Component="AutoGen" class="rz-ms-2" />
+                        </div>
+                    </RadzenStack>
+                    @if (!IsNew)
+                    {
+                        <RadzenFieldset Text="Computed by the database (read-only)" class="rz-mt-3">
+                            <RadzenRow Gap="1rem">
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="SAP invoice #" Variant="Variant.Outlined" Style="width: 100%"><RadzenTextBox Value="@Model.SapInvoiceNumber" Disabled="true" /></RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Bottler-facing status" Variant="Variant.Outlined" Style="width: 100%"><RadzenTextBox Value="@StatusText(Model.CalculatedBottlerInvoiceStatus)" Disabled="true" /></RadzenFormField>
+                                </RadzenColumn>
+                                <RadzenColumn Size="12" SizeMD="4">
+                                    <RadzenFormField Text="Admin-facing status" Variant="Variant.Outlined" Style="width: 100%"><RadzenTextBox Value="@StatusText(Model.CalculatedAdminInvoiceStatus)" Disabled="true" /></RadzenFormField>
+                                </RadzenColumn>
+                            </RadzenRow>
+                            <RadzenText TextStyle="TextStyle.Caption" class="rz-mt-2 rz-mb-0">
+                                Created @Model.CreatedAt.ToString("yyyy-MM-dd HH:mm") UTC · Updated @Model.UpdatedAt.ToString("yyyy-MM-dd HH:mm") UTC
+                            </RadzenText>
+                        </RadzenFieldset>
+                    }
+                </RadzenTabsItem>
+            </Tabs>
+        </RadzenTabs>
+
+        <RadzenStack Orientation="Orientation.Horizontal" JustifyContent="JustifyContent.End" Gap="0.5rem">
+            <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@Cancel" />
+            <RadzenButton ButtonType="ButtonType.Submit" Text="@(IsNew ? "Create" : "Save")" Icon="save" IsBusy="@IsBusy" />
+        </RadzenStack>
+    </RadzenStack>
+</RadzenTemplateForm>
+
+@code {
+    private readonly IReadOnlyList<EnumOption<InvoiceStatus>> statusOptions = EnumDisplay.Options<InvoiceStatus>();
+    private readonly IReadOnlyList<EnumOption<AccountType>> accountTypeOptions = EnumDisplay.Options<AccountType>();
+    private readonly IReadOnlyList<EnumOption<RevisionReason>> revisionReasonOptions = EnumDisplay.Options<RevisionReason>();
+
+    private IReadOnlyList<LookupService.Option<int>> bottlers = [];
+    private IReadOnlyList<LookupService.Option<int>> payers = [];
+    private IReadOnlyList<LookupService.Option<int>> salesCenters = [];
+    private IReadOnlyList<LookupService.Option<string>> programs = [];
+    private IReadOnlyList<LookupService.Option<int>> currencies = [];
+    private IReadOnlyList<LookupService.Option<int>> companies = [];
+    private IReadOnlyList<LookupService.Option<int>> countries = [];
+    private IReadOnlyList<LookupService.Option<int>> brandSegments = [];
+    private IReadOnlyList<LookupService.InvoiceUser> users = [];
+
+    private static string StatusText(int? value) => EnumDisplay.DisplayNameOrEmpty<InvoiceStatus>(value);
+
+    private string userIdText
+    {
+        get => Model.UserId.ToString();
+        set
+        {
+            if (Guid.TryParse(value, out var g))
+            {
+                Model.UserId = g;
+            }
+        }
+    }
+
+    private bool noPo
+    {
+        get => Model.DoNotHavePoNumber == true;
+        set
+        {
+            Model.DoNotHavePoNumber = value;
+            if (value)
+            {
+                Model.PoNumber = null;
+            }
+        }
+    }
+
+    protected override Invoice CreateNew() => new()
+    {
+        InvoiceType = "Promotional",
+        Status = InvoiceStatus.Draft,
+        RevisionNumber = 0,
+        UserName = string.Empty,
+        UserEmail = string.Empty,
+        InvoiceDate = DateOnly.FromDateTime(DateTime.UtcNow),
+        IsDeleted = false,
+    };
+
+    protected override async Task OnModelLoadedAsync()
+    {
+        bottlers = await Lookups.BottlersAsync();
+        currencies = await Lookups.CurrenciesAsync();
+        companies = await Lookups.CompaniesAsync();
+        countries = await Lookups.CountriesAsync();
+        brandSegments = await Lookups.BrandSegmentCategoriesAsync();
+        users = await Lookups.RecentInvoiceUsersAsync();
+
+        if (IsNew && Model.UserId == Guid.Empty && users.Count > 0)
+        {
+            UserChanged(users[0].UserId);
+        }
+
+        await LoadDependentLookups();
+    }
+
+    private async Task LoadDependentLookups()
+    {
+        payers = await Lookups.PayersForBottlerAsync(Model.BottlerId);
+        salesCenters = await Lookups.SalesCentersForPayerAsync(Model.PayerId);
+        // Programs are per bottler (~8k rows overall); do not render the whole table before a bottler is chosen.
+        programs = Model.BottlerId is null ? [] : await Lookups.ProgramsForBottlerAsync(Model.BottlerId);
+    }
+
+    private async Task BottlerChanged(int? bottlerId)
+    {
+        Model.BottlerId = bottlerId;
+        Model.PayerId = null;
+        Model.SalesCenterId = null;
+        if (Model.ProgramId is not null && bottlerId is not null && !programs.Any(p => p.Value == Model.ProgramId))
+        {
+            Model.ProgramId = null;
+        }
+        await LoadDependentLookups();
+    }
+
+    private async Task PayerChanged(int? payerId)
+    {
+        Model.PayerId = payerId;
+        Model.SalesCenterId = null;
+        salesCenters = await Lookups.SalesCentersForPayerAsync(payerId);
+    }
+
+    private void UserChanged(Guid? userId)
+    {
+        if (userId is null)
+        {
+            return;
+        }
+        Model.UserId = userId.Value;
+        var user = users.FirstOrDefault(u => u.UserId == userId.Value);
+        if (user is not null)
+        {
+            Model.UserName = user.UserName;
+            Model.UserEmail = user.UserEmail;
+        }
+    }
+
+    protected override Task<string?> ValidateAsync()
+    {
+        if (Model.UserId == Guid.Empty)
+        {
+            return Task.FromResult<string?>("A portal user must be selected (Invoices.UserId is required).");
+        }
+        if (Model.PromoPeriodFrom is not null && Model.PromoPeriodTo is not null && Model.PromoPeriodTo < Model.PromoPeriodFrom)
+        {
+            return Task.FromResult<string?>("Promo period 'to' must be on or after 'from'.");
+        }
+        return Task.FromResult<string?>(null);
+    }
+}
