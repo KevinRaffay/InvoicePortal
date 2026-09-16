@@ -3,6 +3,10 @@
 This document describes the structure, data flows and integration points of the Invoice Portal Admin
 proof of concept. It complements [README.md](README.md), which covers how to run the solution.
 
+The diagrams are Mermaid. If your Markdown viewer does not draw them, open
+[docs/ARCHITECTURE.html](docs/ARCHITECTURE.html) in a browser: it is the same content with the diagrams
+rendered (needs network access once to load mermaid.js from a CDN).
+
 **One-paragraph summary.** A .NET 10 Blazor Web App (Interactive Server render mode, Radzen components)
 administers a local copy of the Invoice Portal database. The database is SQL Server 2022 Express running in
 Docker, populated once from a production bacpac by a one-shot console app. All data access goes through an

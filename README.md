@@ -55,6 +55,9 @@ those elements from `model.xml`, rewrites the checksum in `Origin.xml`, and impo
 
 ## Project layout
 
+Architecture, data flows and integration points are described in [ARCHITECTURE.md](ARCHITECTURE.md)
+(rendered copy with diagrams: [docs/ARCHITECTURE.html](docs/ARCHITECTURE.html)).
+
 ```
 InvoicePortal.slnx
 docker-compose.yml, .env            compose definition and local SA password (git-ignored)
