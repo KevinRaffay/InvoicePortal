@@ -48,10 +48,31 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_HTTP_PORTS: "8080"
       ConnectionStrings__InvoicePortal: "Server=sql,1433;Database=${DB_NAME};User Id=sa;Password=${MSSQL_SA_PASSWORD};Encrypt=True;TrustServerCertificate=True;"
-      # AI feature flags (mock provider: no keys, no network). Set Ai__Enabled: "false" to hide the AI UI.
+      # AI feature flags. Set Ai__Enabled: "false" to hide the AI UI.
       Ai__Enabled: "true"
       Ai__DocumentChatEnabled: "true"
-      Ai__Provider: Mock
+      # AI_PROVIDER=Mock (default, offline fake) or Ollama (real local model). Values come from .env.
+      # With Ollama installed on the Windows host (uses the GPU), the default endpoint below already works.
+      # For the CPU-only sidecar instead: `docker compose --profile ollama up -d` and set
+      # AI_OLLAMA_ENDPOINT=http://ollama:11434 in .env.
+      Ai__Provider: ${AI_PROVIDER:-Mock}
+      Ai__Ollama__Endpoint: ${AI_OLLAMA_ENDPOINT:-http://host.docker.internal:11434}
+      Ai__Ollama__Model: ${AI_OLLAMA_MODEL:-qwen2.5-coder:7b}
+
+  # Optional, CPU-only local model inside Docker (no WSL/GPU needed). Started only with --profile ollama.
+  # Needs the Docker Desktop VM raised to ~12 GB (Settings > Resources); a 7B model does not fit in 4 GB.
+  # First run: docker compose exec ollama ollama pull ${AI_OLLAMA_MODEL:-qwen2.5-coder:7b}
+  ollama:
+    image: ollama/ollama:latest
+    container_name: invoiceportal-ollama
+    profiles: ["ollama"]
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "30m"
 
 volumes:
   mssql-data:
+  ollama-data:

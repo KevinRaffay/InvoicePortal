@@ -13,7 +13,15 @@
 </RadzenStack>
 <RadzenText TextStyle="TextStyle.Body2" class="rz-color-secondary rz-mb-4">
     Ask a question about the invoice data in plain English. The model writes a read-only SQL query, the app validates and runs it,
-    and the results appear below. Provider: <b>@Ai.Value.Provider</b> (pattern-matched intents; the prompt, guards and execution are real).
+    and the results appear below. Provider: <b>@Ai.Value.Provider</b>
+    @if (Ai.Value.Provider == "Ollama")
+    {
+        <text>&nbsp;(local model <b>@Ai.Value.Ollama.Model</b> at @Ai.Value.Ollama.Endpoint; free-form questions work, and the guards reject bad SQL).</text>
+    }
+    else
+    {
+        <text>&nbsp;(pattern-matched intents; the prompt, guards and execution are real).</text>
+    }
 </RadzenText>
 
 @if (!Ai.Value.Enabled)

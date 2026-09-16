@@ -99,4 +99,15 @@ public class QueryGenerationServiceTests
         var user = Assert.Single(chat.LastMessages, m => m.Role == ChatRole.User).Text;
         Assert.Equal("hello", user);
     }
+
+    [Fact]
+    public async Task Asks_the_model_for_deterministic_json_output()
+    {
+        var chat = new StubChatClient("{\"sql\": \"SELECT 1\", \"paramValues\": []}");
+        await Create(chat).GenerateAsync("hello");
+
+        Assert.NotNull(chat.LastOptions);
+        Assert.Equal(0, chat.LastOptions.Temperature);
+        Assert.Same(ChatResponseFormat.Json, chat.LastOptions.ResponseFormat);
+    }
 }

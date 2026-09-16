@@ -33,6 +33,14 @@ public sealed class QueryGenerationService(
         - If the request cannot be answered with a SELECT, return {"error": "<why>"}.
 
         Response shape: {"sql": "<T-SQL>", "paramValues": [<values>]}
+
+        Examples:
+        User: Top 5 payers by total amount
+        {"sql": "SELECT TOP (@p0) p.Name AS Payer, COUNT(i.Id) AS InvoiceCount, SUM(i.Amount) AS TotalAmount FROM Invoices i JOIN Payers p ON p.Id = i.PayerId WHERE i.IsDeleted = 0 GROUP BY p.Name ORDER BY TotalAmount DESC", "paramValues": [5]}
+        User: Count invoices per currency
+        {"sql": "SELECT c.Code AS Currency, COUNT(i.Id) AS InvoiceCount FROM Invoices i JOIN Currencies c ON c.Id = i.CurrencyId WHERE i.IsDeleted = 0 GROUP BY c.Code ORDER BY InvoiceCount DESC", "paramValues": []}
+        User: Delete all invoices
+        {"error": "Only read-only SELECT queries are supported."}
         """;
 
     public async Task<GeneratedQuery> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
@@ -47,7 +55,7 @@ public sealed class QueryGenerationService(
 
         var response = await chat.GetResponseAsync(
             [new ChatMessage(ChatRole.System, BuildSystemPrompt()), new ChatMessage(ChatRole.User, trimmed)],
-            new ChatOptions { Temperature = 0 },
+            new ChatOptions { Temperature = 0, ResponseFormat = ChatResponseFormat.Json },
             cancellationToken);
 
         return Parse(response.Text);

@@ -92,7 +92,7 @@ with **every external service replaced by an in-process mock**. Nothing leaves t
 
 | customer-insights                                    | Here                                                                 |
 |------------------------------------------------------|----------------------------------------------------------------------|
-| GPT model via Azure OpenAI                           | `MockChatClient` behind `Microsoft.Extensions.AI.IChatClient`        |
+| GPT model via Azure OpenAI                           | `MockChatClient` (default) or a local Ollama model, both behind `Microsoft.Extensions.AI.IChatClient` |
 | `/generateSql`: NL -> SQL, read-only txn, dynamic grid | `/ai/query`: NL -> T-SQL, `SqlGuard` + rollback-only executor, Radzen dynamic grid |
 | Foundry IQ knowledge-base retrieve + `[S#]` citations | `InMemoryDocumentRetriever` (seeded docs, BM25, threshold, dedupe) + `CitationSelector` |
 | Chat help dialog                                     | "Ask the documents" dialog (header button; per-row on Bottlers, the "customer" here) |
@@ -114,11 +114,54 @@ Configuration (`appsettings.json`, overridable with environment variables as in 
 |----------------------------|---------|--------------------------------------------------------------|
 | `Ai__Enabled`              | `true`  | Hides all AI entry points and makes `/ai/query` refuse when false |
 | `Ai__DocumentChatEnabled`  | `true`  | Gates the "Ask the documents" dialog                         |
-| `Ai__Provider`             | `Mock`  | Only registered provider; see below                          |
+| `Ai__Provider`             | `Mock`  | `Mock` (offline fake) or `Ollama` (real local model, below)  |
+| `Ai__Ollama__Endpoint`     | `http://localhost:11434` | Ollama base URL (`http://host.docker.internal:11434` from the app container) |
+| `Ai__Ollama__Model`        | `qwen2.5-coder:7b` | Model tag; must already be pulled                   |
+| `Ai__Ollama__TimeoutSeconds` | `120` | Per-call HTTP timeout                                          |
+| `Ai__Ollama__ContextLength` | `8192` | Ollama `num_ctx`; the schema prompt needs more than the default |
 
-Swapping in a real model is one registration in `Ai/AiServiceCollectionExtensions.cs` (add a `case` that calls
-`AddChatClient(...)` with a real `IChatClient`, e.g. Azure OpenAI's `.AsIChatClient()`), plus a real
-`IDocumentRetriever` if you want Foundry IQ instead of the seeded index. Nothing else changes.
+Swapping in a cloud model is one more `case` in `Ai/AiServiceCollectionExtensions.cs` (call `AddChatClient(...)`
+with a real `IChatClient`, e.g. Azure OpenAI's `.AsIChatClient()`), plus a real `IDocumentRetriever` if you want
+Foundry IQ instead of the seeded index. Nothing else changes.
+
+### Running a real local model (Ollama)
+
+The `Ollama` provider replaces the fake model with a small model running on this machine, through the same
+`IChatClient`. The retriever stays the seeded in-memory index. With a real model the suggestion chips are just
+suggestions: free-form questions work, and bad SQL from the model is rejected by `SqlGuard` and shown as an
+error rather than executed.
+
+1. Install [Ollama for Windows](https://ollama.com/download) (or `winget install Ollama.Ollama`). It uses the
+   NVIDIA GPU directly, no WSL needed. Then pull a coder-tuned model:
+
+   ```bash
+   ollama pull qwen2.5-coder:7b
+   ```
+
+   `qwen2.5-coder:7b` (about 4.7 GB) just fits a 6 GB GPU; use `qwen2.5-coder:3b` if it spills to CPU or memory
+   is tight. Coder models are markedly better at text-to-SQL than general chat models of the same size.
+
+2. Point the app at it.
+   - Docker: set `AI_PROVIDER=Ollama` in `.env` (the default endpoint `http://host.docker.internal:11434`
+     reaches Ollama on the host) and run `docker compose up -d app`.
+   - Host-side: `$env:Ai__Provider='Ollama'` before `dotnet run --project InvoicePortal.Admin --launch-profile http`.
+
+3. Expect the first query after a model load to take a few seconds on the GPU (the schema prompt is a few
+   thousand tokens); Ollama caches the shared prompt prefix, so later queries are faster.
+
+CPU-only alternative inside Docker (no host install): raise the Docker Desktop VM memory to about 12 GB
+(Settings > Resources; a 7B model does not fit beside SQL Server in the default 4 GB), then
+
+```bash
+docker compose --profile ollama up -d
+```
+
+```bash
+docker compose exec ollama ollama pull qwen2.5-coder:7b
+```
+
+and set `AI_OLLAMA_ENDPOINT=http://ollama:11434` with `AI_PROVIDER=Ollama` in `.env`. Without GPU passthrough
+(which needs the WSL2 backend) expect 10 to 50 seconds per query depending on model size.
 
 SQL Server caveat: unlike the PostgreSQL `READ ONLY` transaction the reference relies on, SQL Server has no
 engine-level read-only transaction. Safety here is guard-based (single SELECT/WITH, keyword denylist, `@p0..`

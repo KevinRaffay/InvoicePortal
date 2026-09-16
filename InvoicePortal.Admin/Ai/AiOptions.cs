@@ -17,9 +17,15 @@ public sealed class AiOptions
     /// <summary>Gates the "Ask the documents" dialog (the Foundry IQ analogue).</summary>
     public bool DocumentChatEnabled { get; set; } = true;
 
-    /// <summary>Only "Mock" is registered. A real provider is one extra case in AiServiceCollectionExtensions.</summary>
-    [RegularExpression("^(Mock)$", ErrorMessage = "Ai:Provider must be 'Mock' (the only registered provider).")]
+    /// <summary>
+    /// "Mock" (default; deterministic fake, offline) or "Ollama" (a real local model behind the same
+    /// <c>IChatClient</c>). A cloud provider is one extra case in AiServiceCollectionExtensions.
+    /// </summary>
+    [Required, RegularExpression("^(Mock|Ollama)$", ErrorMessage = "Ai:Provider must be 'Mock' or 'Ollama'.")]
     public string Provider { get; set; } = "Mock";
+
+    /// <summary>Settings for the Ollama provider (ignored when Provider is Mock).</summary>
+    public OllamaOptions Ollama { get; set; } = new();
 
     [Range(1, 20000)] public int MaxPromptLength { get; set; } = 4000;
     [Range(1, 1000)] public int RateLimitPerMinute { get; set; } = 10;
@@ -29,4 +35,22 @@ public sealed class AiOptions
 
     /// <summary>Analogue of the Foundry IQ reranker threshold: chunks scoring below this are dropped.</summary>
     [Range(0, 100)] public double RetrievalMinScore { get; set; } = 1.0;
+}
+
+/// <summary>
+/// Where the local model runs. Ollama on the Windows host (uses the GPU) is reached from the app container via
+/// <c>http://host.docker.internal:11434</c>; from a host-side <c>dotnet run</c> via <c>http://localhost:11434</c>.
+/// </summary>
+public sealed class OllamaOptions
+{
+    [Required, Url] public string Endpoint { get; set; } = "http://localhost:11434";
+
+    /// <summary>Must already be pulled (<c>ollama pull qwen2.5-coder:7b</c>). Coder-tuned models do best at text-to-SQL.</summary>
+    [Required] public string Model { get; set; } = "qwen2.5-coder:7b";
+
+    /// <summary>Per-call HTTP timeout. CPU-only inference of the schema prompt can take tens of seconds.</summary>
+    [Range(5, 600)] public int TimeoutSeconds { get; set; } = 120;
+
+    /// <summary>Ollama's default context is too small for the schema prompt plus a reply; this sets num_ctx.</summary>
+    [Range(1024, 131072)] public int ContextLength { get; set; } = 8192;
 }

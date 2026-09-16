@@ -8,12 +8,14 @@ internal sealed class StubChatClient(string reply) : IChatClient
 {
     public List<ChatMessage> LastMessages { get; } = [];
     public int Calls { get; private set; }
+    public ChatOptions? LastOptions { get; private set; }
 
     public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         Calls++;
         LastMessages.Clear();
         LastMessages.AddRange(messages);
+        LastOptions = options;
         return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply)));
     }
 
