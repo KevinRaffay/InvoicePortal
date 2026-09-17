@@ -10,10 +10,15 @@
     "build": "node build.js",
     "build:pdf": "node build.js --pdf",
     "check": "node build.js --check",
+    "build:presentation": "node presentation/build.mjs",
+    "check:presentation": "node presentation/validate.mjs",
+    "render:presentation": "powershell -NoProfile -File presentation/render.ps1",
     "preview": "node serve.cjs 8090"
   },
   "devDependencies": {
+    "jszip": "3.10.2",
     "markdown-it": "^15.0.2",
+    "pptxgenjs": "4.0.1",
     "puppeteer-core": "^25.11.0"
   }
 }

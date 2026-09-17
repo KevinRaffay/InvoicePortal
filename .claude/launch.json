@@ -22,6 +22,16 @@
       "url": "http://localhost:8080"
     },
     {
+      "name": "admin-attach",
+      "url": "http://localhost:5098"
+    },
+    {
+      "name": "admin-host-alt",
+      "runtimeExecutable": "dotnet",
+      "runtimeArgs": ["run", "--project", "InvoicePortal.Admin/InvoicePortal.Admin.csproj", "--launch-profile", "http", "--", "--urls", "http://localhost:5099"],
+      "port": 5099
+    },
+    {
       "name": "docs",
       "runtimeExecutable": "node",
       "runtimeArgs": ["docs/serve.cjs", "8090"],
