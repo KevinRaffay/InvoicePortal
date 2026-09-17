@@ -16,27 +16,140 @@ any code; it was only used once, read-only, to inspect the schema.
 The database is checked in as SQL, so the repository stands on its own - no bacpac, no export, no
 production data. See [db/README.md](db/README.md).
 
-## Prerequisites
+## Quickstart
 
-- Docker Desktop with Linux containers and **at least 4 GB of memory** (Settings -> Resources).
-  The SQL Server image refuses to start below 2 GB; `db-init` checks and fails fast with a message.
-- For host-side development only: .NET SDK 10.
+Clone, copy one file, and start the stack. Nothing else is needed - no bacpac, no database export,
+no Azure account, no API keys.
 
-## Run
+### Prerequisites
+
+| Tool | Version | Why | Required? |
+|---|---|---|---|
+| [Docker Desktop](https://www.docker.com/products/docker-desktop/) | current | Runs the whole stack | Yes |
+| [Visual Studio Code](https://code.visualstudio.com/) | current | Editor used below | Yes for this guide |
+| [Git](https://git-scm.com/downloads) | current | Clone the repository | Yes |
+| [.NET SDK 10](https://dotnet.microsoft.com/download/dotnet/10.0) | 10.0 | Only for host-side runs, debugging and `dotnet test` | No |
+
+Two Docker Desktop settings matter, both under **Settings -> Resources**:
+
+- **Linux containers** (the default on macOS and Linux; on Windows make sure you are not switched to
+  Windows containers).
+- **At least 4 GB of memory.** The SQL Server image refuses to start below 2 GB, and `db-init`
+  checks first and fails with a clear message rather than leaving you to guess.
+
+VS Code will offer the three extensions this repo recommends the first time you open it
+(`.vscode/extensions.json`), or run **Extensions: Show Recommended Extensions** from the Command
+Palette:
+
+| Extension | Id | What it gives you |
+|---|---|---|
+| C# Dev Kit | `ms-dotnettools.csdevkit` | Solution view, IntelliSense, debugging, test explorer |
+| Container Tools | `ms-azuretools.vscode-containers` | Start/stop/inspect the compose services from the sidebar |
+| SQL Server (mssql) | `ms-mssql.mssql` | Query the demo database directly (optional) |
+
+Only C# Dev Kit is needed to debug; the other two are conveniences.
+
+### 1. Clone and open
+
+```bash
+git clone https://github.com/KevinRaffay/InvoicePortal.git
+cd InvoicePortal
+code .
+```
+
+### 2. Create your `.env`
+
+Compose reads `.env` for the SA password and database name. It is git-ignored, so a fresh clone does
+not have one - copy the tracked example. **Skipping this step is the usual cause of a first run
+failing**: the password substitutes to an empty string and SQL Server refuses to start.
+
+```bash
+cp .env.example .env
+```
+
+In PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+The defaults work as-is. The SA password in it is a throwaway local credential and matches
+`InvoicePortal.Admin/appsettings.Development.json`, so host-side runs reach the same container.
+
+### 3. Start the stack
+
+Open the integrated terminal with **Ctrl+`** (**Cmd+`** on macOS) and run:
 
 ```bash
 docker compose up --build
 ```
 
-Then open <http://localhost:8080>. The first run takes a few minutes for image pulls and the build;
-the database itself is created in about a second. Subsequent runs skip it entirely, because
-`db-init` exits immediately when the database already exists.
+Or, without the terminal: **Ctrl+Shift+P** -> **Tasks: Run Task** -> **compose: up**, which runs the
+same thing detached. With the Container Tools extension, the containers also appear in the sidebar
+where you can view logs, open a shell or restart a single service.
 
-Rebuild the database from scratch:
+The first run takes a few minutes for image pulls and the .NET builds. The database itself is built
+in about a second, by `db-init` applying [`db/001_schema.sql`](db/001_schema.sql) and
+[`db/002_seed_demo_data.sql`](db/002_seed_demo_data.sql). Watch for:
 
-```bash
-docker compose down -v
 ```
+[db-init] Applying 001_schema.sql (4 batches)...
+[db-init] Applying 002_seed_demo_data.sql (4 batches)...
+[db-init] Database built in 00:01.
+```
+
+Later runs skip it: `db-init` exits immediately when the database already exists.
+
+### 4. Open the app
+
+<http://localhost:8080>
+
+You should land on a dashboard with counts from the demo data: 3,900 invoices, 40 bottlers, 90 payers,
+200 sales centers, 392 programs, 2 currencies. The counts exclude soft-deleted rows, which is why
+invoices read 3,900 rather than the 4,000 seeded - toggle **Show deleted** on the Invoices page to
+see the rest.
+
+The lookup pages, **AI Insights** and **Ask the documents** all work offline against the `Mock`
+provider - no model download, no network.
+
+### Debugging in VS Code
+
+To set breakpoints, run the app on the host against the containerised database. This needs .NET SDK 10.
+
+1. Start only the database: **Tasks: Run Task** -> **compose: up (sql only)**, or
+   `docker compose up -d sql db-init`. Stop the `app` container if it is running, so port 8080 and
+   the database are not being used by two copies of the app.
+2. Press **F5** and pick **Admin (host, debug)**. The app builds, starts on
+   <http://localhost:5098>, and breakpoints in `.cs` and `.razor` files bind.
+
+**Admin (host, debug + OpenTelemetry)** is the same thing pointed at the Aspire Dashboard; start it
+first with `docker compose --profile otel up -d aspire-dashboard` and open
+<http://localhost:18888>. See [Telemetry](#telemetry-opentelemetry).
+
+Run the tests from the Testing sidebar (C# Dev Kit discovers them), with **Tasks: Run Task** ->
+**test**, or `dotnet test`. They need no database.
+
+### Everyday commands
+
+Each has a matching VS Code task, under **Tasks: Run Task**.
+
+| Command | What it does |
+|---|---|
+| `docker compose up --build` | Build and start everything |
+| `docker compose up -d sql db-init` | Database only, for host-side debugging |
+| `docker compose logs -f app` | Follow the app's logs |
+| `docker compose down` | Stop everything, keep the data |
+| `docker compose down -v` | Stop and drop the volume, so the database is rebuilt from `db/*.sql` next time |
+
+### If the first run fails
+
+| Symptom | Cause and fix |
+|---|---|
+| `The "MSSQL_SA_PASSWORD" variable is not set` | No `.env`. Do step 2. |
+| `sql` container exits right after starting | Docker Desktop memory below 2 GB. Raise it to 4 GB in Settings -> Resources. |
+| `db-init` exits 1 with a script error | It drops the partial database first, so just fix the cause and run `docker compose up` again. |
+| Port 8080 or 1433 already in use | Something else holds the port - often an earlier copy of this stack (`docker compose down`) or a local SQL Server on 1433. |
+| App loads but every page errors | The database is not ready or was built partially. `docker compose down -v && docker compose up --build`. |
 
 ## What `db-init` does
 
@@ -319,14 +432,20 @@ dotnet run --project InvoicePortal.Admin --launch-profile http
 ```
 
 `appsettings.Development.json` points at `localhost,1433` with the same throwaway SA password as `.env`.
+For the same thing under a debugger, see [Debugging in VS Code](#debugging-in-vs-code).
 
 ## Troubleshooting
+
+First-run problems are covered by [If the first run fails](#if-the-first-run-fails). Rarer ones:
 
 - `docker compose up` hangs at "Container invoiceportal-db-init Starting" while `docker ps` still works:
   the Docker Desktop engine has wedged on that container (seen once on the Hyper-V backend; `docker start`,
   `docker inspect` and `docker rm` on it all time out). Quit and reopen Docker Desktop, then run
   `docker compose up -d` again. The SQL data volume survives the restart.
-- SQL container exits immediately: Docker Desktop memory is below 2 GB (see Prerequisites).
+- Breakpoints never bind when debugging on the host: the `app` container is probably still running and
+  serving the page you are looking at. `docker compose stop app`, then F5 and use port 5098.
+- `dotnet build` fails with "file is locked by InvoicePortal.Admin": a host-side run is still going.
+  Stop the debug session, or the `dotnet run` process holding `bin/Debug`.
 
 ## Data caveat
 

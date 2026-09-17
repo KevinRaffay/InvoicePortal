@@ -76,6 +76,8 @@ InvoicePortal.slnx
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL->SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
 ├── InvoicePortal.Admin.Tests/     xUnit tests for AI, telemetry and logging, no database required
+├── .vscode/                       recommended extensions, build/compose tasks, F5 debug configurations
+├── .env.example                   tracked template; copy to .env before the first compose up
 ├── docs/                          this document's rendered copy + build script, Azure deployment guide
 ├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
 ├── azure.yaml                     Azure Developer CLI (azd) service definition
@@ -636,7 +638,7 @@ before enabling it outside the local machine.
 |-------------------------------------|---------------------------------------------------|------------------------------------------------|
 | `ASPNETCORE_ENVIRONMENT`            | `Production`                                      | `Development` (launch profile `http`)          |
 | `ConnectionStrings__InvoicePortal`  | env var, `Server=sql,1433`                        | `appsettings.Development.json`, `localhost,1433` |
-| HTTP port                           | 8080                                              | 5098 (`.claude/launch.json`, profile `http`)   |
+| HTTP port                           | 8080                                              | 5098 (launch profile `http`; `.vscode/launch.json` for F5) |
 | `Ai__Enabled`, `Ai__DocumentChatEnabled` | env vars in `docker-compose.yml`              | `appsettings.json` defaults                     |
 | `Ai__Provider`, `Ai__Ollama__Endpoint`, `Ai__Ollama__Model` | from `.env` (`AI_PROVIDER`, `AI_OLLAMA_ENDPOINT`, `AI_OLLAMA_MODEL`) with Mock / host Ollama defaults | `appsettings.json` defaults, or `Ai__Provider` set in the shell |
 | SQL SA password, DB name            | `.env` (`MSSQL_SA_PASSWORD`, `DB_NAME`), read by compose | same password hard-coded in `appsettings.Development.json` |
@@ -648,6 +650,11 @@ before enabling it outside the local machine.
 | `AppLogging__FileSizeLimitBytes`, `AppLogging__RetainedFileCountLimit` | 10485760 bytes, 14 files, daily and size rolling | same defaults; not necessarily 14 days |
 | `DD_API_KEY`, `DD_SITE` | ignored for local logging | used only in Azure; site defaults to `datadoghq.com`, key must be a secret reference |
 | `Telemetry__OtlpLogsEnabled` | true when OTLP configured | true, keeps Aspire structured logs |
+
+Compose reads `.env`, which is git-ignored. `.env.example` is tracked and is the template a fresh clone
+copies to `.env`; without it compose substitutes a blank SA password and `sql` never starts. The SA
+password there is a throwaway local credential and deliberately matches the one in
+`appsettings.Development.json`, so host-side runs reach the same container.
 
 Azure detection checks `CONTAINER_APP_NAME`, `WEBSITE_INSTANCE_ID`, or `WEBSITE_SITE_NAME`; neither
 `Production` nor cloud credentials imply Azure. For Azure VM/AKS hosting use the explicit override.

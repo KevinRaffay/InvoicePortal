@@ -2,6 +2,7 @@
 **/obj/
 **/logs/
 **/.vs/
+.vscode/
 *.bacpac
 .env
 .env.*

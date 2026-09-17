@@ -226,6 +226,8 @@ Easy Auth, without application code changes.</p>
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL-&gt;SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
 ├── InvoicePortal.Admin.Tests/     xUnit tests for AI, telemetry and logging, no database required
+├── .vscode/                       recommended extensions, build/compose tasks, F5 debug configurations
+├── .env.example                   tracked template; copy to .env before the first compose up
 ├── docs/                          this document's rendered copy + build script, Azure deployment guide
 ├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
 ├── azure.yaml                     Azure Developer CLI (azd) service definition
@@ -1064,7 +1066,7 @@ before enabling it outside the local machine.</p>
 <tr>
 <td>HTTP port</td>
 <td>8080</td>
-<td>5098 (<code>.claude/launch.json</code>, profile <code>http</code>)</td>
+<td>5098 (launch profile <code>http</code>; <code>.vscode/launch.json</code> for F5)</td>
 </tr>
 <tr>
 <td><code>Ai__Enabled</code>, <code>Ai__DocumentChatEnabled</code></td>
@@ -1123,6 +1125,10 @@ before enabling it outside the local machine.</p>
 </tr>
 </tbody>
 </table></div>
+<p>Compose reads <code>.env</code>, which is git-ignored. <code>.env.example</code> is tracked and is the template a fresh clone
+copies to <code>.env</code>; without it compose substitutes a blank SA password and <code>sql</code> never starts. The SA
+password there is a throwaway local credential and deliberately matches the one in
+<code>appsettings.Development.json</code>, so host-side runs reach the same container.</p>
 <p>Azure detection checks <code>CONTAINER_APP_NAME</code>, <code>WEBSITE_INSTANCE_ID</code>, or <code>WEBSITE_SITE_NAME</code>; neither
 <code>Production</code> nor cloud credentials imply Azure. For Azure VM/AKS hosting use the explicit override.
 <code>AppLogging__ApplicationInsightsEnabled</code> and <code>AppLogging__DatadogEnabled</code> can disable cloud sinks separately.
