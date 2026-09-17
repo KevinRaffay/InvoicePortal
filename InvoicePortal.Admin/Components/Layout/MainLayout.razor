@@ -11,7 +11,7 @@
             <RadzenStack Orientation="Orientation.Horizontal" AlignItems="AlignItems.Center" Gap="0.5rem">
                 <RadzenSidebarToggle Click="@(() => sidebarExpanded = !sidebarExpanded)" />
                 <RadzenIcon Icon="receipt_long" />
-                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0">Invoice Portal Admin</RadzenText>
+                <RadzenText TextStyle="TextStyle.H6" class="rz-mb-0" Style="color: white;">Invoice Portal Admin</RadzenText>
                 <RadzenBadge BadgeStyle="BadgeStyle.Warning" Text="LOCAL POC" class="rz-ml-2" />
             </RadzenStack>
             @if (Ai.Value.Enabled && Ai.Value.DocumentChatEnabled)
