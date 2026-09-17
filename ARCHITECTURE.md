@@ -11,7 +11,8 @@ them with `npm run build:pdf` in the `docs/` folder (see `docs/package.json`).
 
 **One-paragraph summary.** A .NET 10 Blazor Web App (Interactive Server render mode, Radzen components)
 administers a local copy of the Invoice Portal database. The database is SQL Server 2022 Express running in
-Docker, populated once from a production bacpac by a one-shot console app. All data access goes through an
+Docker, built once by a one-shot console app from SQL scripts committed under `db/` - the schema plus
+synthetic demo data, so the repository needs no production export. All data access goes through an
 EF Core scaffolded model behind a `DbContext` factory. Two AI features, natural-language-to-SQL and grounded
 document Q&A, are built on the `Microsoft.Extensions.AI` abstractions. The chat model is pluggable: the default
 `Mock` provider is an in-process fake that needs no network, `Ollama` talks to a local model, and `AzureOpenAI`
@@ -29,16 +30,18 @@ flowchart LR
     subgraph compose["docker compose (single host)"]
         App["app<br/>InvoicePortal.Admin<br/>Blazor Server :8080"]
         Sql[("sql<br/>SQL Server 2022 Express<br/>:1433, volume mssql-data")]
-        Init["db-init<br/>InvoicePortal.DbInit<br/>one-shot, DacFx"]
+        Init["db-init<br/>InvoicePortal.DbInit<br/>one-shot"]
     end
-    Bacpac["mec-invoiceportal-prod.bacpac<br/>(read-only bind mount)"]
+    Scripts["db/*.sql<br/>schema + synthetic demo data<br/>(committed, baked into the image)"]
+    Bacpac["bacpac (optional)<br/>read-only bind mount,<br/>docker-compose.bacpac.yml"]
     Model["Chat model (optional)<br/>Ollama on the host or the ollama profile,<br/>or an Azure OpenAI deployment"]
 
     Browser <-->|"HTTP + WebSocket"| App
     App -->|"EF Core / ADO.NET (TDS)"| Sql
     App -.->|"IChatClient, only when Ai:Provider is not Mock"| Model
-    Init -->|"SqlClient + DacFx import"| Sql
-    Bacpac -.->|"mounted at /bacpac/source.bacpac"| Init
+    Init -->|"SqlClient: CREATE DATABASE, then batches"| Sql
+    Scripts -->|"copied to /app/db, the default route"| Init
+    Bacpac -.->|"mounted at /bacpac/source.bacpac when BACPAC_PATH is set"| Init
 ```
 
 Compose start-up ordering is enforced with health conditions: `db-init` waits for `sql` to pass its
@@ -47,7 +50,7 @@ Compose start-up ordering is enforced with health conditions: `db-init` waits fo
 | Service   | Image / build                              | Role                                                             |
 |-----------|--------------------------------------------|------------------------------------------------------------------|
 | `sql`     | `mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express` | Database engine. Data persists in the `mssql-data` volume. |
-| `db-init` | `InvoicePortal.DbInit/Dockerfile`          | Sanitises and imports the bacpac if the database does not exist. |
+| `db-init` | `InvoicePortal.DbInit/Dockerfile`          | Builds the database from `db/*.sql` if it does not exist, or imports a bacpac when `BACPAC_PATH` is set. |
 | `app`     | `InvoicePortal.Admin/Dockerfile`           | The admin UI. HTTP only, port 8080. Exposes `/healthz`.          |
 | `ollama`  | `ollama/ollama:latest`, profile `ollama` only | Optional CPU-only local model. Started with `--profile ollama`; data in the `ollama-data` volume. |
 | `aspire-dashboard` | `mcr.microsoft.com/dotnet/aspire-dashboard:latest`, profile `otel` only | Optional in-memory OTLP sink with a UI on 18888 (see 3.4). Started with `--profile otel`. |
@@ -62,7 +65,8 @@ Easy Auth, without application code changes.
 
 ```
 InvoicePortal.slnx
-├── InvoicePortal.DbInit/          console app: bacpac sanitiser + DacFx importer
+├── db/                            committed database: 001_schema.sql, 002_seed_demo_data.sql, README.md
+├── InvoicePortal.DbInit/          console app: SQL script runner + bacpac sanitiser/DacFx importer
 ├── InvoicePortal.Admin/           Blazor Web App
 │   ├── Program.cs                 composition root (EntryPoint.Main)
 │   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
@@ -72,6 +76,8 @@ InvoicePortal.slnx
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL->SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
 ├── InvoicePortal.Admin.Tests/     xUnit tests for AI, telemetry and logging, no database required
+├── .vscode/                       recommended extensions, build/compose tasks, F5 debug configurations
+├── .env.example                   tracked template; copy to .env before the first compose up
 ├── docs/                          this document's rendered copy + build script, Azure deployment guide
 ├── infra/                         Bicep for the Azure deployment (Container Apps, ACR, identity, Blob, App Insights, Azure OpenAI)
 ├── azure.yaml                     Azure Developer CLI (azd) service definition
@@ -271,7 +277,13 @@ returns, so the `Event` span is a trace root of its own, and the SignalR hub-met
 The EF Core model is scaffolded from the local database and never edited by hand (the re-scaffold command
 is in the README). Anything that must survive a re-scaffold lives in partial classes.
 
-**Tables in the model** (nine of the many in the database):
+`db/001_schema.sql` is the committed definition of that local database. It carries the nine tables below
+plus the seven more they reach through a foreign key - `AspNetUsers`, `CancellationCategories`,
+`CommercialManagers`, `FundingElements`, `ProgramTypes`, `SamplesPurposes` and `Vendors` - sixteen in all.
+The production database has around eighty; the rest play no part in this POC and are deliberately absent,
+which is why a scaffold run against a demo database and one against a full export produce the same model.
+
+**Tables in the model** (nine of the sixteen in the schema):
 
 | Table                    | Role in the UI                  | Soft delete | Audit columns |
 |--------------------------|---------------------------------|-------------|---------------|
@@ -305,25 +317,38 @@ table this app does not manage. New invoices therefore default to the submitter 
 
 ### 5.1 Database provisioning (db-init, runs once)
 
+`db-init` has two routes. Which one runs depends on a single environment variable: `BACPAC_PATH`. Unset
+(the default) means build from the committed scripts, and nothing outside the repository is needed.
+
 ```mermaid
 sequenceDiagram
     participant C as docker compose
     participant I as db-init
     participant S as SQL Server (master)
-    participant F as sanitised bacpac (temp)
+    participant D as InvoicePortal database
 
     C->>I: start (after sql healthy)
     I->>I: check /proc/meminfo is at least 2 GB
-    I->>I: check BACPAC_PATH exists
+    I->>I: pick route from BACPAC_PATH, list /app/db/*.sql
     loop up to 3 min
         I->>S: SELECT 1
     end
     I->>S: SELECT DB_ID(@name)
     alt database exists
         I-->>C: exit 0 (nothing to do)
-    else
-        I->>F: BacpacSanitizer.Create(source, temp)
-        Note over F: remove SqlUser, SqlRoleMembership,<br/>SqlPermissionStatement, SqlDatabaseCredential,<br/>SqlMasterKey from model.xml.<br/>Set IsEncryptionOn=False.<br/>Rewrite SHA-256 in Origin.xml
+    else scripts route (default)
+        I->>S: CREATE DATABASE
+        I->>D: open one connection, apply 001_schema.sql then 002_seed_demo_data.sql
+        Note over D: each file split on GO into batches,<br/>run in order on the same connection so<br/>SET NOEXEC and IDENTITY_INSERT carry across
+        alt a batch fails
+            I->>S: ALTER DATABASE SET SINGLE_USER, then DROP DATABASE
+            I-->>C: exit 1
+        else
+            I-->>C: exit 0
+        end
+    else bacpac route (BACPAC_PATH set)
+        I->>I: BacpacSanitizer.Create(source, temp)
+        Note over I: remove SqlUser, SqlRoleMembership,<br/>SqlPermissionStatement, SqlDatabaseCredential,<br/>SqlMasterKey from model.xml.<br/>Set IsEncryptionOn=False.<br/>Rewrite SHA-256 in Origin.xml
         I->>S: DacServices.ImportBacpac(temp, DB_NAME)
         alt import fails
             I->>S: ALTER DATABASE SET SINGLE_USER, then DROP DATABASE
@@ -331,13 +356,20 @@ sequenceDiagram
         else
             I-->>C: exit 0
         end
-        I->>F: delete temp file
+        I->>I: delete temp file
     end
 ```
 
-The original bacpac is never modified. Azure SQL bacpacs contain Entra ID users, a master key, a scoped
-credential and the TDE flag, none of which an on-premises SQL Server can create, so the sanitiser strips
-them from `model.xml` and recomputes the checksum DacFx verifies.
+**Scripts route.** `SqlScriptRunner` lists `/app/db/*.sql` in ordinal filename order, splits each file on
+lines containing only `GO`, and executes the batches on one connection. The single connection matters: the
+seed script relies on session state that does not survive a reconnect. The `db/` folder is copied into the
+`db-init` image at build time, so the container carries its own copy and no bind mount is involved. Building
+the database takes about a second.
+
+**Bacpac route.** The original bacpac is never modified. Azure SQL bacpacs contain Entra ID users, a master
+key, a scoped credential and the TDE flag, none of which an on-premises SQL Server can create, so the
+sanitiser strips them from `model.xml` and recomputes the checksum DacFx verifies. Import takes roughly a
+minute. `docker-compose.bacpac.yml` is the override that sets `BACPAC_PATH` and mounts the file.
 
 ### 5.2 Grid load (server-side paging, sorting, filtering)
 
@@ -491,7 +523,7 @@ environment variable in compose and from `appsettings.Development.json` for host
 
 | Component                      | Mechanism                                        | What it does                                                           |
 |--------------------------------|--------------------------------------------------|------------------------------------------------------------------------|
-| `InvoicePortal.DbInit`         | `Microsoft.Data.SqlClient` to `master`; DacFx    | Readiness poll, `DB_ID` existence check, `ImportBacpac`, drop on failure. Reads `SQL_SERVER`, `SQL_PORT`, `DB_NAME`, `MSSQL_SA_PASSWORD`, `BACPAC_PATH`. |
+| `InvoicePortal.DbInit`         | `Microsoft.Data.SqlClient` to `master`, then to the new database; DacFx on the bacpac route | Readiness poll, `DB_ID` existence check, then either `CREATE DATABASE` plus the `db/*.sql` batches or `ImportBacpac`; drops the database on failure. Reads `SQL_SERVER`, `SQL_PORT`, `DB_NAME`, `MSSQL_SA_PASSWORD`, `SCRIPTS_PATH`, `BACPAC_PATH`. |
 | `CrudService<T>`               | EF Core via `IDbContextFactory`                  | Paged list, find, exists, count, insert, update, soft/hard delete, restore. `AsNoTracking` for reads. |
 | `LookupService`                | EF Core via factory                              | Projection queries for dropdowns, cached 30 s per circuit.             |
 | `InMemoryDocumentRetriever`    | EF Core via factory, once                        | Loads four bottler names to fill document placeholders.                |
@@ -606,10 +638,11 @@ before enabling it outside the local machine.
 |-------------------------------------|---------------------------------------------------|------------------------------------------------|
 | `ASPNETCORE_ENVIRONMENT`            | `Production`                                      | `Development` (launch profile `http`)          |
 | `ConnectionStrings__InvoicePortal`  | env var, `Server=sql,1433`                        | `appsettings.Development.json`, `localhost,1433` |
-| HTTP port                           | 8080                                              | 5098 (`.claude/launch.json`, profile `http`)   |
+| HTTP port                           | 8080                                              | 5098 (launch profile `http`; `.vscode/launch.json` for F5) |
 | `Ai__Enabled`, `Ai__DocumentChatEnabled` | env vars in `docker-compose.yml`              | `appsettings.json` defaults                     |
 | `Ai__Provider`, `Ai__Ollama__Endpoint`, `Ai__Ollama__Model` | from `.env` (`AI_PROVIDER`, `AI_OLLAMA_ENDPOINT`, `AI_OLLAMA_MODEL`) with Mock / host Ollama defaults | `appsettings.json` defaults, or `Ai__Provider` set in the shell |
 | SQL SA password, DB name            | `.env` (`MSSQL_SA_PASSWORD`, `DB_NAME`), read by compose | same password hard-coded in `appsettings.Development.json` |
+| `SCRIPTS_PATH`, `BACPAC_PATH` (db-init) | `SCRIPTS_PATH=/app/db` in `docker-compose.yml`; `BACPAC_PATH` unset unless `docker-compose.bacpac.yml` is layered on | defaults to `/app/db`; set `BACPAC_PATH` to import a bacpac instead |
 | `OTEL_EXPORTER_OTLP_ENDPOINT`, `Telemetry__RecordSqlText` | from `.env` (`OTEL_EXPORTER_OTLP_ENDPOINT`, `TELEMETRY_RECORD_SQL_TEXT`), empty / false by default | `Telemetry` section in `appsettings.json`, or `OTEL_EXPORTER_OTLP_ENDPOINT` set in the shell (`http://localhost:18889` for the dashboard) |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | not set                                       | not set; set by the Bicep template in Azure     |
 | `AppLogging__RunningInAzure` | unset, auto-detects as local despite Production | unset, auto-detects as local; override for other Azure hosts |
@@ -617,6 +650,11 @@ before enabling it outside the local machine.
 | `AppLogging__FileSizeLimitBytes`, `AppLogging__RetainedFileCountLimit` | 10485760 bytes, 14 files, daily and size rolling | same defaults; not necessarily 14 days |
 | `DD_API_KEY`, `DD_SITE` | ignored for local logging | used only in Azure; site defaults to `datadoghq.com`, key must be a secret reference |
 | `Telemetry__OtlpLogsEnabled` | true when OTLP configured | true, keeps Aspire structured logs |
+
+Compose reads `.env`, which is git-ignored. `.env.example` is tracked and is the template a fresh clone
+copies to `.env`; without it compose substitutes a blank SA password and `sql` never starts. The SA
+password there is a throwaway local credential and deliberately matches the one in
+`appsettings.Development.json`, so host-side runs reach the same container.
 
 Azure detection checks `CONTAINER_APP_NAME`, `WEBSITE_INSTANCE_ID`, or `WEBSITE_SITE_NAME`; neither
 `Production` nor cloud credentials imply Azure. For Azure VM/AKS hosting use the explicit override.
@@ -671,8 +709,10 @@ returns 404 for `blazor.web.js` and no circuit starts.
 - **Prompt injection**: the Q&A system prompt tells the model to treat source text as data. Citation
   validation ensures the answer can only reference supplied sources. With a real model this remains a
   mitigation, not a guarantee.
-- **Data**: the bacpac is a copy of production data, including user emails. It lives only in the Docker
-  volume and the bind-mounted file, both excluded from git.
+- **Data**: the repository is public and everything committed under `db/` is synthetic - invented for the
+  demo, not sampled or anonymised from any real system, with `example.com` addresses throughout. A bacpac,
+  on the optional route, is a copy of production data including user emails; it lives only in the Docker
+  volume and the bind-mounted file, both excluded from git by the `*.bacpac` rule.
 - **Telemetry/logging**: local defaults write console and rolling files but do not export remotely. OTLP,
   Application Insights and Azure Datadog require configured destinations/credentials. SQL/prompt content is
   excluded from spans unless the telemetry privacy switches are enabled. Log messages and exceptions are
@@ -710,8 +750,12 @@ credentials and an environment smoke test, and is not claimed by offline tests.
 
 ## 11. Known limitations and extension points
 
-- **Scope**: nine tables. The database has many more (users, attachments, workflow, cancellation
-  categories, samples purposes) that are visible only as foreign-key ids.
+- **Scope**: nine tables in the UI, sixteen in the committed schema. The production database has around
+  eighty; attachments, payments, statements, workflow history and the rest are absent, and the tables that
+  remain (users, cancellation categories, samples purposes) are visible only as foreign-key ids.
+- **Demo data**: `db/002_seed_demo_data.sql` is a generator, not a capture. It produces plausible shapes
+  and volumes, but the distributions are arithmetic rather than observed, so it will not reproduce a
+  performance characteristic or a data-quality problem seen in production. Use a real bacpac for that.
 - **`Invoices.UserId`**: satisfied by borrowing a recent submitter because `AspNetUsers` is out of scope.
 - **Mock model**: understands only the regex intents in `SqlIntentCatalog`; everything else returns the
   fallback error. Real providers remove that limit but add latency (seconds on a GPU, tens of seconds on

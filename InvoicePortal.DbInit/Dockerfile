@@ -8,4 +8,6 @@ RUN dotnet publish InvoicePortal.DbInit/InvoicePortal.DbInit.csproj -c Release -
 FROM mcr.microsoft.com/dotnet/runtime:10.0 AS final
 WORKDIR /app
 COPY --from=build /app .
+# Schema + synthetic demo data, applied when no bacpac is mounted.
+COPY db/ db/
 ENTRYPOINT ["dotnet", "InvoicePortal.DbInit.dll"]

@@ -2,8 +2,13 @@ using InvoicePortal.DbInit;
 using Microsoft.Data.SqlClient;
 using Microsoft.SqlServer.Dac;
 
-// One-shot database initialiser: restores the Invoice Portal bacpac into a local SQL Server
-// (Express) container. Idempotent - exits immediately if the database already exists.
+// One-shot database initialiser for the local SQL Server (Express) container. Idempotent -
+// exits immediately if the database already exists. Two routes:
+//
+//   scripts (default)  Creates the database and applies the checked-in db/*.sql files: the
+//                      schema plus synthetic demo data. Needs nothing outside the repository.
+//   bacpac (opt-in)    Restores a bacpac mounted at BACPAC_PATH instead. Used when you have a
+//                      real export to work against; see docker-compose.bacpac.yml.
 
 const long MinimumMemoryKb = 2L * 1024 * 1024; // mssql container image minimum
 
@@ -15,13 +20,21 @@ if (password.Length == 0)
 {
     Fail("MSSQL_SA_PASSWORD is not set.");
 }
-var bacpacPath = GetEnv("BACPAC_PATH", "/bacpac/source.bacpac");
+var bacpacPath = GetEnv("BACPAC_PATH", string.Empty);
+var scriptsPath = GetEnv("SCRIPTS_PATH", "/app/db");
 
 CheckMemory();
 
-if (!File.Exists(bacpacPath))
+var useBacpac = bacpacPath.Length > 0;
+if (useBacpac && !File.Exists(bacpacPath))
 {
-    Fail($"Bacpac not found at {bacpacPath}. Mount mec-invoiceportal-prod.bacpac there.");
+    Fail($"BACPAC_PATH is set to {bacpacPath} but no file is mounted there.");
+}
+
+IReadOnlyList<string> scripts = useBacpac ? [] : SqlScriptRunner.FindScripts(scriptsPath);
+if (!useBacpac && scripts.Count == 0)
+{
+    Fail($"No .sql files found in {scriptsPath}. Expected the repository's db/ folder to be present in the image.");
 }
 
 var masterConnectionString = new SqlConnectionStringBuilder
@@ -41,6 +54,33 @@ if (await DatabaseExistsAsync(masterConnectionString, dbName))
 {
     Log($"Database '{dbName}' already present - nothing to do.");
     return 0;
+}
+
+if (!useBacpac)
+{
+    Log($"Building database '{dbName}' on {server},{port} from {scripts.Count} script(s) in {scriptsPath}...");
+    var scriptsStarted = DateTime.UtcNow;
+
+    try
+    {
+        await CreateDatabaseAsync(masterConnectionString, dbName);
+
+        var dbConnectionString = new SqlConnectionStringBuilder(masterConnectionString)
+        {
+            InitialCatalog = dbName,
+            ConnectTimeout = 30,
+        }.ConnectionString;
+
+        await SqlScriptRunner.RunAsync(dbConnectionString, scripts, Log);
+        Log($"Database built in {DateTime.UtcNow - scriptsStarted:mm\\:ss}.");
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Log($"Script run FAILED: {ex}");
+        await TryDropDatabaseAsync(masterConnectionString, dbName);
+        return 1;
+    }
 }
 
 var sanitizedPath = Path.Combine(Path.GetTempPath(), "invoiceportal-sanitized.bacpac");
@@ -151,6 +191,14 @@ static async Task<bool> DatabaseExistsAsync(string connectionString, string dbNa
     command.Parameters.AddWithValue("@name", dbName);
     var result = await command.ExecuteScalarAsync();
     return result is not null && result != DBNull.Value;
+}
+
+static async Task CreateDatabaseAsync(string connectionString, string dbName)
+{
+    await using var connection = new SqlConnection(connectionString);
+    await connection.OpenAsync();
+    await using var command = new SqlCommand($"CREATE DATABASE [{dbName}];", connection) { CommandTimeout = 120 };
+    await command.ExecuteNonQueryAsync();
 }
 
 static async Task TryDropDatabaseAsync(string connectionString, string dbName)

@@ -1,0 +1,55 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${workspaceFolder}/InvoicePortal.slnx"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "test",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["test", "${workspaceFolder}/InvoicePortal.Admin.Tests/InvoicePortal.Admin.Tests.csproj"],
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "compose: up",
+      "detail": "Build images and start sql, db-init and app. App on http://localhost:8080",
+      "type": "shell",
+      "command": "docker compose up --build -d",
+      "problemMatcher": []
+    },
+    {
+      "label": "compose: up (sql only)",
+      "detail": "Start just the database, for debugging the app on the host",
+      "type": "shell",
+      "command": "docker compose up -d sql db-init",
+      "problemMatcher": []
+    },
+    {
+      "label": "compose: logs",
+      "type": "shell",
+      "command": "docker compose logs -f app",
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "compose: down",
+      "type": "shell",
+      "command": "docker compose down",
+      "problemMatcher": []
+    },
+    {
+      "label": "compose: down + reset database",
+      "detail": "Removes the mssql-data volume, so db-init rebuilds from db/*.sql on the next up",
+      "type": "shell",
+      "command": "docker compose down -v",
+      "problemMatcher": []
+    }
+  ]
+}
