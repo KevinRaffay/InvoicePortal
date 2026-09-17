@@ -83,6 +83,13 @@ public static class EntryPoint
             logging.IsAzure(app.Configuration), !logging.IsAzure(app.Configuration),
             logging.UseApplicationInsights(app.Configuration), logging.UseDatadog(app.Configuration));
 
+        // First in the pipeline, so one record per request carries the status code the client
+        // actually received - after the exception handler and the status-code re-execute below.
+        if (logging.RequestLoggingEnabled)
+        {
+            app.UseMiddleware<RequestLoggingMiddleware>();
+        }
+
         if (!app.Environment.IsDevelopment())
         {
             app.UseExceptionHandler("/Error", createScopeForErrors: true);

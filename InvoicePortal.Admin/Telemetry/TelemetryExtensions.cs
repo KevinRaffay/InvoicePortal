@@ -17,8 +17,10 @@ public static class TelemetryExtensions
     /// Blob Storage), SQL Server commands issued by EF Core and the guarded executor, one span per chat-model call,
     /// and the app's own spans in <see cref="InvoicePortalTelemetry.Source"/>.</item>
     /// <item>Metrics: ASP.NET Core, Kestrel, HttpClient, .NET runtime, EF Core, chat token usage and the app's own counters.</item>
-    /// <item>Logs: Serilog forwards to the OTLP provider for Aspire/collectors when enabled.
-    /// Application Insights and Datadog logs are sent by Serilog only.</item>
+    /// <item>Logs: this adds an OTLP logging <em>provider</em> for Aspire/collectors when enabled. It sits
+    /// alongside Serilog's provider rather than being fed by it, so anything written through
+    /// <c>ILogger&lt;T&gt;</c> reaches both, while anything written to Serilog's own API reaches Serilog
+    /// sinks only. Application Insights and Datadog logs are sent by Serilog only.</item>
     /// </list>
     /// Exporters depend on configuration: OTLP when <c>Telemetry:OtlpEndpoint</c> (or <c>OTEL_EXPORTER_OTLP_ENDPOINT</c>)
     /// is set, Azure Monitor when <c>Telemetry:AzureMonitorConnectionString</c> (or <c>APPLICATIONINSIGHTS_CONNECTION_STRING</c>)

@@ -323,6 +323,33 @@ Azure detection uses `CONTAINER_APP_NAME`, `WEBSITE_INSTANCE_ID`, or `WEBSITE_SI
 `Production` environment or the presence of cloud credentials. Override with `AppLogging__RunningInAzure`
 (`true`/`false`) for other hosting such as Azure VMs/AKS. Leave it unset for automatic detection.
 
+### Per-request logging
+
+`RequestLoggingMiddleware` writes one record per HTTP request - method, path, status code and elapsed
+milliseconds - at `Information`, or `Warning` for 4xx and `Error` for 5xx and unhandled exceptions:
+
+```
+HTTP GET /invoices responded 200 in 19.6633 ms
+HTTP GET /definitely-not-a-page responded 404 in 5.6840 ms
+```
+
+It runs first in the pipeline, so the status it reports is the one the client received, after the
+exception handler and the `/not-found` re-execute. Turn it off with `AppLogging__RequestLoggingEnabled=false`.
+
+Two details worth knowing:
+
+- It logs through `ILogger<T>` rather than Serilog's `UseSerilogRequestLogging`. Serilog is registered as
+  a logging *provider* and OpenTelemetry adds a second one for OTLP; only records written through
+  Microsoft.Extensions.Logging reach both. `UseSerilogRequestLogging` writes straight to Serilog, so its
+  output would appear in the console and files but **not** in the Aspire dashboard.
+- It skips the same paths tracing skips (`TelemetryExtensions.IsNoiseRequest`): `/healthz`, `/_framework`,
+  `/_content`, `/_blazor`, `/lib` and static assets. In a Blazor Server app that means you get page loads
+  and endpoint calls, not a line per SignalR message. Interactions inside a circuit are not HTTP requests;
+  they appear as spans under Traces (for example `Event onclick -> Radzen.Blazor.RadzenButton.OnClick`).
+
+The framework's own request logging stays suppressed by the `Microsoft.AspNetCore` override at `Warning`
+in `appsettings.json`, which is what keeps this to one line per request instead of three.
+
 Local defaults: `logs/invoiceportal-YYYYMMDD.json` relative to the app's content root, daily rolling and
 additional rolls at 10 MiB, retaining 14 **files**, not necessarily 14 days. A single oversized event may
 exceed the size threshold. Configure `AppLogging__FilePath`, `AppLogging__FileSizeLimitBytes`, and

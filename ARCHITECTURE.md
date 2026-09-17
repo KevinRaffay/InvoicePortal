@@ -71,7 +71,7 @@ InvoicePortal.slnx
 │   ├── Program.cs                 composition root (EntryPoint.Main)
 │   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
 │   ├── Services/                  CrudService<T>, LookupService, EnumDisplay
-│   ├── Logging/                   Serilog routing, validated settings, Application Insights correlation
+│   ├── Logging/                   Serilog routing, validated settings, App Insights correlation, request logging
 │   ├── Data/                      EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL->SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
@@ -184,7 +184,17 @@ dialog, Delete with confirmation, Restore, the "Show deleted" toggle, and notifi
 Docker Production) write console and daily/size-rolled JSON files. Azure hosts write console plus Application
 Insights and Datadog when their credentials are supplied, without local files. `EntryPoint.Main` uses a
 console bootstrap logger and flushes on exit. `Telemetry/TelemetryExtensions.cs` keeps OpenTelemetry traces
-and metrics, plus optional OTLP logs forwarded by Serilog for Aspire. OpenTelemetry can be disabled independently.
+and metrics, plus optional OTLP logs for Aspire. OpenTelemetry can be disabled independently.
+
+Serilog and OpenTelemetry are both registered as `Microsoft.Extensions.Logging` **providers**:
+`builder.Logging.ClearProviders()` then `AddSerilog(...)`, and `otel.WithLogging(...)` adds the OTLP
+provider alongside it. A record written through `ILogger<T>` therefore reaches both - Serilog's sinks and
+the OTLP exporter. One written straight to Serilog's own API reaches only Serilog's sinks, which is why
+`Logging/RequestLoggingMiddleware.cs` logs per-request lines through `ILogger<T>` rather than using
+`UseSerilogRequestLogging`: the latter would never appear in the Aspire dashboard. That middleware runs
+first in the pipeline, reports the status the client received, reuses `TelemetryExtensions.IsNoiseRequest`
+so logs and traces agree on what a real request is, and is switched off with
+`AppLogging:RequestLoggingEnabled`.
 
 ```mermaid
 flowchart LR
@@ -650,6 +660,7 @@ before enabling it outside the local machine.
 | `AppLogging__FileSizeLimitBytes`, `AppLogging__RetainedFileCountLimit` | 10485760 bytes, 14 files, daily and size rolling | same defaults; not necessarily 14 days |
 | `DD_API_KEY`, `DD_SITE` | ignored for local logging | used only in Azure; site defaults to `datadoghq.com`, key must be a secret reference |
 | `Telemetry__OtlpLogsEnabled` | true when OTLP configured | true, keeps Aspire structured logs |
+| `AppLogging__RequestLoggingEnabled` | true: one log record per HTTP request | same default |
 
 Compose reads `.env`, which is git-ignored. `.env.example` is tracked and is the template a fresh clone
 copies to `.env`; without it compose substitutes a blank SA password and `sql` never starts. The SA

@@ -18,6 +18,9 @@ public sealed class AppLoggingOptions
     public string? DatadogApiKey { get; set; }
     public string? DatadogSite { get; set; }
 
+    /// <summary>One log record per HTTP request (see <see cref="RequestLoggingMiddleware"/>). Set false to turn it off.</summary>
+    public bool RequestLoggingEnabled { get; set; } = true;
+
     public bool IsAzure(IConfiguration configuration) => RunningInAzure ??
         (!string.IsNullOrWhiteSpace(configuration["CONTAINER_APP_NAME"])
          || !string.IsNullOrWhiteSpace(configuration["WEBSITE_INSTANCE_ID"])

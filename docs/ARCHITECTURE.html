@@ -221,7 +221,7 @@ Easy Auth, without application code changes.</p>
 │   ├── Program.cs                 composition root (EntryPoint.Main)
 │   ├── Components/                Razor UI: Layout, Pages (Invoices, Lookups, Ai), Shared bases
 │   ├── Services/                  CrudService&lt;T&gt;, LookupService, EnumDisplay
-│   ├── Logging/                   Serilog routing, validated settings, Application Insights correlation
+│   ├── Logging/                   Serilog routing, validated settings, App Insights correlation, request logging
 │   ├── Data/                      EF Core scaffold (never hand-edited) + Partials + Enums + Abstractions
 │   ├── Ai/                        AI slice: options, DI, Chat (mock + transport wrapper), Query (NL-&gt;SQL), Documents (RAG)
 │   └── Telemetry/                 OpenTelemetry options, provider/exporter wiring, the app's ActivitySource and Meter
@@ -450,7 +450,16 @@ dialog, Delete with confirmation, Restore, the &quot;Show deleted&quot; toggle, 
 Docker Production) write console and daily/size-rolled JSON files. Azure hosts write console plus Application
 Insights and Datadog when their credentials are supplied, without local files. <code>EntryPoint.Main</code> uses a
 console bootstrap logger and flushes on exit. <code>Telemetry/TelemetryExtensions.cs</code> keeps OpenTelemetry traces
-and metrics, plus optional OTLP logs forwarded by Serilog for Aspire. OpenTelemetry can be disabled independently.</p>
+and metrics, plus optional OTLP logs for Aspire. OpenTelemetry can be disabled independently.</p>
+<p>Serilog and OpenTelemetry are both registered as <code>Microsoft.Extensions.Logging</code> <strong>providers</strong>:
+<code>builder.Logging.ClearProviders()</code> then <code>AddSerilog(...)</code>, and <code>otel.WithLogging(...)</code> adds the OTLP
+provider alongside it. A record written through <code>ILogger&lt;T&gt;</code> therefore reaches both - Serilog's sinks and
+the OTLP exporter. One written straight to Serilog's own API reaches only Serilog's sinks, which is why
+<code>Logging/RequestLoggingMiddleware.cs</code> logs per-request lines through <code>ILogger&lt;T&gt;</code> rather than using
+<code>UseSerilogRequestLogging</code>: the latter would never appear in the Aspire dashboard. That middleware runs
+first in the pipeline, reports the status the client received, reuses <code>TelemetryExtensions.IsNoiseRequest</code>
+so logs and traces agree on what a real request is, and is switched off with
+<code>AppLogging:RequestLoggingEnabled</code>.</p>
 <figure class="diagram"><pre class="mermaid">
 flowchart LR
     subgraph app[&quot;InvoicePortal.Admin&quot;]
@@ -1122,6 +1131,11 @@ before enabling it outside the local machine.</p>
 <td><code>Telemetry__OtlpLogsEnabled</code></td>
 <td>true when OTLP configured</td>
 <td>true, keeps Aspire structured logs</td>
+</tr>
+<tr>
+<td><code>AppLogging__RequestLoggingEnabled</code></td>
+<td>true: one log record per HTTP request</td>
+<td>same default</td>
 </tr>
 </tbody>
 </table></div>
