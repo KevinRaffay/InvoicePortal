@@ -38,7 +38,7 @@ public static partial class SqlIntentCatalog
                   "FROM Invoices i JOIN Bottlers b ON b.Id = i.BottlerId WHERE i.IsDeleted = 0 " +
                   "GROUP BY b.Name, b.SalesOrganization ORDER BY InvoiceCount DESC", [ParseInt(m.Groups[1].Value, 10)])),
 
-        new("bottler-invoices", "Show invoices for bottler Coca",
+        new("bottler-invoices", "Show invoices for bottler Cascade",
             BottlerNamed(),
             m => (InvoiceList + " AND b.Name LIKE @p0 ORDER BY i.InvoiceDate DESC", [$"%{m.Groups["name"].Value.Trim()}%"])),
 

@@ -6,18 +6,20 @@ of the Invoice Portal database. Everything runs in Docker Compose:
 | Service   | What it is                                                                                  |
 |-----------|---------------------------------------------------------------------------------------------|
 | `sql`     | SQL Server 2022 **Express** (`mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express`) |
-| `db-init` | One-shot .NET console app that restores `mec-invoiceportal-prod.bacpac` into `sql` (DacFx)  |
+| `db-init` | One-shot .NET console app that builds the database from [`db/`](db/) - schema plus synthetic demo data |
 | `app`     | The Blazor admin UI on <http://localhost:8080>                                              |
 | `aspire-dashboard` | Optional (`--profile otel`): local OpenTelemetry sink with a UI on <http://localhost:18888> |
 
 No connection to Azure is made by any of these. `.env.Development` in this folder is **not** read by
 any code; it was only used once, read-only, to inspect the schema.
 
+The database is checked in as SQL, so the repository stands on its own - no bacpac, no export, no
+production data. See [db/README.md](db/README.md).
+
 ## Prerequisites
 
 - Docker Desktop with Linux containers and **at least 4 GB of memory** (Settings -> Resources).
   The SQL Server image refuses to start below 2 GB; `db-init` checks and fails fast with a message.
-- `mec-invoiceportal-prod.bacpac` in this folder (it is git-ignored).
 - For host-side development only: .NET SDK 10.
 
 ## Run
@@ -26,11 +28,11 @@ any code; it was only used once, read-only, to inspect the schema.
 docker compose up --build
 ```
 
-Then open <http://localhost:8080>. The first run takes a few minutes (image pulls, build, and the
-bacpac import, roughly one minute for ~744k rows). Subsequent runs skip the import because `db-init`
-exits immediately when the database already exists.
+Then open <http://localhost:8080>. The first run takes a few minutes for image pulls and the build;
+the database itself is created in about a second. Subsequent runs skip it entirely, because
+`db-init` exits immediately when the database already exists.
 
-Reset the database to the bacpac contents:
+Rebuild the database from scratch:
 
 ```bash
 docker compose down -v
@@ -38,11 +40,23 @@ docker compose down -v
 
 ## What `db-init` does
 
-Azure SQL bacpacs contain objects an on-premises SQL Server cannot create: Entra ID (external) users,
-their role memberships and grants, a database master key, a database scoped credential and the TDE
-flag. `db-init` writes a sanitised **copy** of the bacpac (the original is never modified), removes
-those elements from `model.xml`, rewrites the checksum in `Origin.xml`, and imports it with
-`Microsoft.SqlServer.DacFx`. If the import fails it drops the partial database so the next run retries.
+By default it creates the database and applies [`db/001_schema.sql`](db/001_schema.sql) and
+[`db/002_seed_demo_data.sql`](db/002_seed_demo_data.sql) in order, on a single connection. If a
+script fails it drops the partial database so the next run retries.
+
+Set `BACPAC_PATH` and it takes the other route instead, restoring a bacpac with DacFx. Azure SQL
+bacpacs contain objects an on-premises SQL Server cannot create: Entra ID (external) users, their
+role memberships and grants, a database master key, a database scoped credential and the TDE flag.
+`db-init` writes a sanitised **copy** of the bacpac (the original is never modified), removes those
+elements from `model.xml`, rewrites the checksum in `Origin.xml`, and imports that.
+`docker-compose.bacpac.yml` wires this up:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.bacpac.yml up --build
+```
+
+Bacpacs are git-ignored and must stay that way: they hold production data and this repository is
+public.
 
 ## Scope of the UI
 
@@ -64,7 +78,8 @@ the `update-architecture` skill in `.claude/skills/` walks through keeping them 
 ```
 InvoicePortal.slnx
 docker-compose.yml, .env            compose definition and local SA password (git-ignored)
-InvoicePortal.DbInit/               bacpac sanitiser + importer (runs once)
+db/                                 schema + synthetic demo data as SQL (see db/README.md)
+InvoicePortal.DbInit/               builds the database from db/, or imports a bacpac (runs once)
 InvoicePortal.Admin/
   Data/InvoicePortalDbContext.cs    EF Core scaffold output - never hand-edited
   Data/Entities/*.cs                EF Core scaffold output - never hand-edited
@@ -315,6 +330,9 @@ dotnet run --project InvoicePortal.Admin --launch-profile http
 
 ## Data caveat
 
-The bacpac is a copy of production data (invoices, user emails). It lives only on the local Docker
-volume `mssql-data`; `.gitignore` excludes `*.bacpac` and `.env*`. Do not push the volume or the
-bacpac anywhere.
+**This repository is public.** Everything committed under [`db/`](db/) is invented for the demo -
+no row is derived from, sampled from, or anonymised out of a production system.
+
+A bacpac, if you use one, is a copy of production data (invoices, user emails). It lives only on
+your disk and on the local Docker volume `mssql-data`; `.gitignore` excludes `*.bacpac` and
+`.env*`. Do not commit either, and do not push the volume or the bacpac anywhere.

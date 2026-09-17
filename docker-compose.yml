@@ -29,9 +29,9 @@ services:
       SQL_SERVER: sql
       DB_NAME: ${DB_NAME}
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD}
-      BACPAC_PATH: /bacpac/source.bacpac
-    volumes:
-      - ./mec-invoiceportal-prod.bacpac:/bacpac/source.bacpac:ro
+      # Builds the database from the repo's db/*.sql (schema + synthetic demo data).
+      # To restore a real bacpac instead, add docker-compose.bacpac.yml (see README).
+      SCRIPTS_PATH: /app/db
     restart: "no"
 
   app:

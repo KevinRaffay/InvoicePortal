@@ -1,0 +1,13 @@
+# Optional override: restore a real bacpac instead of building the database from db/*.sql.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.bacpac.yml up --build
+#
+# Expects mec-invoiceportal-prod.bacpac in the repository root. Bacpacs are git-ignored and
+# must never be committed - the default route in docker-compose.yml needs no bacpac at all.
+
+services:
+  db-init:
+    environment:
+      BACPAC_PATH: /bacpac/source.bacpac
+    volumes:
+      - ./mec-invoiceportal-prod.bacpac:/bacpac/source.bacpac:ro
