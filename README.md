@@ -186,7 +186,8 @@ public.
 Architecture, data flows and integration points are described in [ARCHITECTURE.md](ARCHITECTURE.md)
 (rendered copies with diagrams: [docs/ARCHITECTURE.html](docs/ARCHITECTURE.html) and
 [docs/ARCHITECTURE.pdf](docs/ARCHITECTURE.pdf), regenerated with `npm run build:pdf` in `docs/`, Node 18+;
-the `update-architecture` skill in `.claude/skills/` walks through keeping them current).
+the `update-architecture` skill in `.claude/skills/` walks through keeping them current). How the project was
+built, session by session and prompt by prompt, is recorded in [docs/SESSIONS.md](docs/SESSIONS.md).
 
 ```
 InvoicePortal.slnx
